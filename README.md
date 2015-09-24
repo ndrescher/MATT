@@ -1,2 +1,3 @@
 # MATT
-Mathematics, Algebra, Trigonometry Tutor (Capstone Project)
+Mathematics, Algebra, Trigonometry Tutor
+Senior Capstone Project Fall 2015
