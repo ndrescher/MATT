@@ -1,0 +1,10 @@
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\bin\Debug\MATT.exe.config
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.csprojResolveAssemblyReference.cache
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.mainForm.resources
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.Properties.Resources.resources
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.csproj.GenerateResource.Cache
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\bin\Debug\MATT.exe
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\bin\Debug\MATT.pdb
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.exe
+c:\users\nicki\documents\visual studio 2012\Projects\MATT\MATT\obj\Debug\MATT.pdb
+C:\Users\Nicki\Documents\Visual Studio 2012\Projects\MATT\MATT\obj\Debug\MATT.csproj.ResolveComReference.cache
