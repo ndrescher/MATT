@@ -28,9 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(mainForm));
             this.inputPanel = new System.Windows.Forms.Panel();
-            this.eqnPromptLbl = new System.Windows.Forms.Label();
             this.equationTB = new System.Windows.Forms.TextBox();
+            this.eqnPromptLbl = new System.Windows.Forms.Label();
             this.solveBtn = new System.Windows.Forms.Button();
             this.optionsPanel = new System.Windows.Forms.Panel();
             this.linkLabelPanel = new System.Windows.Forms.Panel();
@@ -42,36 +43,43 @@
             // 
             // inputPanel
             // 
-            this.inputPanel.Controls.Add(this.eqnPromptLbl);
             this.inputPanel.Controls.Add(this.equationTB);
+            this.inputPanel.Controls.Add(this.eqnPromptLbl);
             this.inputPanel.Controls.Add(this.solveBtn);
             this.inputPanel.Dock = System.Windows.Forms.DockStyle.Top;
             this.inputPanel.Location = new System.Drawing.Point(0, 0);
             this.inputPanel.Name = "inputPanel";
-            this.inputPanel.Size = new System.Drawing.Size(768, 58);
+            this.inputPanel.Padding = new System.Windows.Forms.Padding(0, 15, 15, 15);
+            this.inputPanel.Size = new System.Drawing.Size(868, 58);
             this.inputPanel.TabIndex = 0;
+            // 
+            // equationTB
+            // 
+            this.equationTB.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.equationTB.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.equationTB.Location = new System.Drawing.Point(199, 15);
+            this.equationTB.Name = "equationTB";
+            this.equationTB.Size = new System.Drawing.Size(579, 27);
+            this.equationTB.TabIndex = 1;
             // 
             // eqnPromptLbl
             // 
             this.eqnPromptLbl.AutoSize = true;
-            this.eqnPromptLbl.Location = new System.Drawing.Point(12, 22);
+            this.eqnPromptLbl.Dock = System.Windows.Forms.DockStyle.Left;
+            this.eqnPromptLbl.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.eqnPromptLbl.Location = new System.Drawing.Point(0, 15);
             this.eqnPromptLbl.Name = "eqnPromptLbl";
-            this.eqnPromptLbl.Size = new System.Drawing.Size(171, 17);
+            this.eqnPromptLbl.Size = new System.Drawing.Size(199, 20);
             this.eqnPromptLbl.TabIndex = 2;
             this.eqnPromptLbl.Text = "Please enter an equation:";
             // 
-            // equationTB
-            // 
-            this.equationTB.Location = new System.Drawing.Point(183, 20);
-            this.equationTB.Name = "equationTB";
-            this.equationTB.Size = new System.Drawing.Size(459, 22);
-            this.equationTB.TabIndex = 1;
-            // 
             // solveBtn
             // 
-            this.solveBtn.Location = new System.Drawing.Point(648, 19);
+            this.solveBtn.Dock = System.Windows.Forms.DockStyle.Right;
+            this.solveBtn.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.solveBtn.Location = new System.Drawing.Point(778, 15);
             this.solveBtn.Name = "solveBtn";
-            this.solveBtn.Size = new System.Drawing.Size(75, 23);
+            this.solveBtn.Size = new System.Drawing.Size(75, 28);
             this.solveBtn.TabIndex = 0;
             this.solveBtn.Text = "Solve";
             this.solveBtn.UseVisualStyleBackColor = true;
@@ -82,46 +90,50 @@
             this.optionsPanel.Controls.Add(this.linkLabelPanel);
             this.optionsPanel.Controls.Add(this.otherOptionsLbl);
             this.optionsPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.optionsPanel.Location = new System.Drawing.Point(0, 479);
+            this.optionsPanel.Location = new System.Drawing.Point(0, 552);
             this.optionsPanel.Name = "optionsPanel";
-            this.optionsPanel.Size = new System.Drawing.Size(768, 113);
+            this.optionsPanel.Size = new System.Drawing.Size(868, 113);
             this.optionsPanel.TabIndex = 1;
             // 
             // linkLabelPanel
             // 
             this.linkLabelPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.linkLabelPanel.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.linkLabelPanel.Location = new System.Drawing.Point(0, 23);
             this.linkLabelPanel.Name = "linkLabelPanel";
-            this.linkLabelPanel.Size = new System.Drawing.Size(768, 90);
+            this.linkLabelPanel.Size = new System.Drawing.Size(868, 90);
             this.linkLabelPanel.TabIndex = 1;
             // 
             // otherOptionsLbl
             // 
             this.otherOptionsLbl.AutoSize = true;
+            this.otherOptionsLbl.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.otherOptionsLbl.Location = new System.Drawing.Point(4, 3);
             this.otherOptionsLbl.Name = "otherOptionsLbl";
-            this.otherOptionsLbl.Size = new System.Drawing.Size(176, 17);
+            this.otherOptionsLbl.Size = new System.Drawing.Size(208, 20);
             this.otherOptionsLbl.TabIndex = 0;
             this.otherOptionsLbl.Text = "Solutions for this equation:";
             // 
             // instructionsRTB
             // 
             this.instructionsRTB.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.instructionsRTB.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.instructionsRTB.Location = new System.Drawing.Point(0, 58);
             this.instructionsRTB.Name = "instructionsRTB";
-            this.instructionsRTB.Size = new System.Drawing.Size(768, 421);
+            this.instructionsRTB.Size = new System.Drawing.Size(868, 494);
             this.instructionsRTB.TabIndex = 2;
-            this.instructionsRTB.Text = "Hi, I\'m MATT. Enter an equation above to get started.";
+            this.instructionsRTB.Text = "Hi, I\'m MATT! Enter an equation above to get started.";
             // 
             // mainForm
             // 
             this.AcceptButton = this.solveBtn;
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(768, 592);
+            this.ClientSize = new System.Drawing.Size(868, 665);
             this.Controls.Add(this.instructionsRTB);
             this.Controls.Add(this.optionsPanel);
             this.Controls.Add(this.inputPanel);
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Name = "mainForm";
             this.Text = "Mathematics, Algebra, and Trigonometry Tutor (MATT)";
             this.inputPanel.ResumeLayout(false);
