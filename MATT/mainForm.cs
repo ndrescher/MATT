@@ -97,9 +97,19 @@ namespace MATT
                         {
                             isEqn = false;
                         }
-                        v1 = s[s.IndexOfAny(alphabet)];
-                        string r = s.Replace(v1, ' ');
-                        v2 = r[r.IndexOfAny(alphabet)];
+                        int v1Index = s.IndexOfAny(alphabet);
+                        if (v1Index != -1)
+                        {
+                            if(v1.Equals(' ')){
+                            v1 = s[v1Index];
+                            }
+                            string r = s.Replace(v1, ' ');
+                            int v2Index = r.IndexOfAny(alphabet);
+                            if (v2Index != -1 && v2.Equals(' '))
+                            {
+                                v2 = r[v2Index];
+                            }
+                        }
                         equations++;
                     }
                 }
@@ -593,36 +603,37 @@ namespace MATT
                 //check for coefficient
                 //int indexOfVariable = separatedEqn.IndexOf(variable1);
                 char afterVar = '\n'; //cannot enter a \n in the textbox
+                string inFrontOfVar = "\n";
                 if (indexOfVariable != -1 && indexOfVariable != 0)
                 {
-                    string coefficient = separatedEqn.Substring(0, indexOfVariable);
+                    inFrontOfVar = separatedEqn.Substring(0, indexOfVariable);
                     //must be a number or ( logically or else would be multiple terms
-                    if (!coefficient.Equals('(') || coefficient.Contains("sqrt"))
+                    if (!inFrontOfVar.Equals('('))
                     {
-                        LinkLabel coef = addLinkLabel("Solve Equation with Coefficients", "DivideBothSides", linkLabelCount++);
-                        if (coef == null) linkLabelCount--;
-                        loadInstructions(coef);
-                    }
-                    if (indexOfVariable != separatedEqn.Length - 1)
-                        afterVar = separatedEqn.ElementAt(indexOfVariable + 1);
-                }
-                else
-                {
-                    string[] split = separatedEqn.Split(' ');
-                    if (split.Count() > 1)
-                    {
-                        //x+(3x+1) should display DivideBothSides
-                    }
-                    else
-                    {
-                        //entered x by itself....graph?
-                        linkLabelPanel.Controls.Clear();//should be only "set to 0 to find roots"
-                        //LinkLabel graph = addLinkLabel("Graphing Linear Equations", "GraphLinear", linkLabelCount++);
-                        //if (graph == null) linkLabelCount--;
-                        //loadInstructions(graph);
-                        instructionsRTB.Text = "I need more information about your problem before I can try to help you. \n\n-Matt";
+                        if (inFrontOfVar.Contains("sqrt"))
+                        {
+                            LinkLabel sqrt = addLinkLabel("Remove Radicals", "RadicalsEqn", linkLabelCount++);
+                            if (sqrt == null) linkLabelCount--;
+                            loadInstructions(sqrt);
+                        }
+
+                        inFrontOfVar = inFrontOfVar.Trim();
+                        int coefIndex = inFrontOfVar.LastIndexOf(' ');
+                        if (coefIndex == -1) // if no space then its just a number
+                            coefIndex = 0;
+                        string coefficient = inFrontOfVar.Substring(coefIndex); //coef is from space to end
+                        double coefNum;
+                        if (coefficient.Equals("*") || double.TryParse(coefficient, out coefNum))
+                        {
+                            LinkLabel coef = addLinkLabel("Solve Equation with Coefficients", "DivideBothSides", linkLabelCount++);
+                            if (coef == null) linkLabelCount--;
+                            loadInstructions(coef);
+                        }
                     }
                 }
+
+                if (indexOfVariable != separatedEqn.Length - 1)
+                    afterVar = separatedEqn.ElementAt(indexOfVariable + 1);
 
                 //if x^power get rid of with radical
                 if (afterVar.Equals('^'))
@@ -630,6 +641,13 @@ namespace MATT
                     LinkLabel exp = addLinkLabel("Solve Equation with Exponents", "SqrtBothSides", linkLabelCount++);
                     if (exp == null) linkLabelCount--;
                     loadInstructions(exp);
+                }
+
+                if (afterVar.Equals('\n') && inFrontOfVar.Equals("\n"))
+                {
+                    //entered x by itself....graph?
+                    linkLabelPanel.Controls.Clear();//should be only "set to 0 to find roots"
+                    instructionsRTB.Text = "I need more information about your problem before I can try to help you. \n\n-Matt";
                 }
             }
             return linkLabelCount;
@@ -690,7 +708,7 @@ namespace MATT
                             List<int> degrees = listDegreesR(variable1, separateNext);
                             if (degrees.Count != degrees.Distinct().Count())
                             {
-                                if(!separateNext.Contains("/") && !separateNext.Contains("*"))
+                                if (!separateNext.Contains("/") && !separateNext.Contains("*"))
                                     combineTerms = true;
                             }
                         }
@@ -763,7 +781,11 @@ namespace MATT
             if (usedOperandTypes.Contains(operandTypes.varVar))
             {
                 //make a list of the indices of varVar operations
-                List<operandTypes> copyUsedOperands = usedOperandTypes;
+                List<operandTypes> copyUsedOperands = new List<operandTypes>();
+                foreach (operandTypes ot in usedOperandTypes)
+                {
+                    copyUsedOperands.Add(ot);
+                }
                 List<int> indices = new List<int>(); //list of indexes of varVar in usedOperandTypes
                 int curVV = copyUsedOperands.LastIndexOf(operandTypes.varVar);
                 while (curVV != -1)
@@ -794,7 +816,7 @@ namespace MATT
                             loadInstructions(combine);
                         }
                     }
-
+                    //3x^2+x/2
                 }
                 //if x*x || x/x, cancel or combine degrees
                 if (operatorsWithVarVar.Contains("*") || operatorsWithVarVar.Contains("/"))
@@ -867,20 +889,56 @@ namespace MATT
                         }
                         else
                         {
-                            //ex: 4x^2-3x+9 factor to solve
-                            LinkLabel factor = addLinkLabel("Factoring Polynomial Equations", "Factoring", linkLabelCount++);
-                            if (factor == null) linkLabelCount--;
-                            loadInstructions(factor);
+                            if (usedOperandTypes.Distinct().Count() > 1)// has varVar but also numVar at least
+                            {
+                                //ex: 4x^2-3x+9 factor to solve
+                                LinkLabel factor = addLinkLabel("Factoring Polynomial Equations", "Factoring", linkLabelCount++);
+                                if (factor == null) linkLabelCount--;
+                                loadInstructions(factor);
+                            }
+                            else
+                            {
+                                //only has one type of operands
+                                if (usedOperandTypes.Contains(operandTypes.varVar))
+                                {
+                                    //3x^2+x
+                                    LinkLabel pull = addLinkLabel("Factoring Out a Common Term", "PullOutAnX", linkLabelCount++);
+                                    if (pull == null) linkLabelCount--;
+                                    loadInstructions(pull);
+                                }
+                                else if (usedOperandTypes.Contains(operandTypes.numVar))
+                                {
+                                    //3x^2+5
+                                    //no * or / to be here, one operandType = numVar, more than one degree
+                                    LinkLabel constants = addLinkLabel("Remove Contant Terms", "RemoveConstants", linkLabelCount++);
+                                    if (constants == null) linkLabelCount--;
+                                    loadInstructions(constants);
+
+                                    //check for coefficients and powers
+                                    string varTerm = separatedEqn;
+                                    foreach (string term in splitEqn)
+                                    {
+                                        if (term.Contains(variable1))
+                                            varTerm = term;
+                                    }
+                                    linkLabelCount = solveOneVarOneTerm(varTerm, variable1, linkLabelCount);
+                                }
+                            }
                         }
                     }
                     else
                     {
+                        string givenSepEqn;
+                        bool multGivenDegrees = separateMultTerms(equationTB.Text, variable1, out givenSepEqn);
                         //ex: 3x+7 move constants to solve
-                        LinkLabel solve = addLinkLabel("Remove Constant Terms", "RemoveConstants", linkLabelCount++);
-                        if (solve == null) linkLabelCount--;
-                        loadInstructions(solve);
+                        if (givenSepEqn.Length == separatedEqn.Length) // only these three terms given
+                        {
+                            LinkLabel solve = addLinkLabel("Remove Constant Terms", "RemoveConstants", linkLabelCount++);
+                            if (solve == null) linkLabelCount--;
+                            loadInstructions(solve);
 
-                        linkLabelCount = solveOneVarOneTerm(separatedEqn, variable1, linkLabelCount);
+                            linkLabelCount = solveOneVarOneTerm(separatedEqn, variable1, linkLabelCount);
+                        }
                     }
                 }
             }
@@ -888,25 +946,29 @@ namespace MATT
             {
                 //has * or / and has numVar need to check that the / or * is actually the operator for numVar
                 //make a list of the indices of numVar operations
-                List<operandTypes> copyUsedOperands = usedOperandTypes;
+                List<operandTypes> copyUsedOperands = new List<operandTypes>();
+                foreach (operandTypes ot in usedOperandTypes)
+                {
+                    copyUsedOperands.Add(ot);
+                }
                 List<int> indices = new List<int>(); //list of indexes of numVar in usedOperandTypes
                 int curNM = copyUsedOperands.LastIndexOf(operandTypes.numVar);
                 while (curNM != -1)
                 {
                     indices.Add(curNM);
                     copyUsedOperands.RemoveAt(curNM);
-                    curNM = copyUsedOperands.LastIndexOf(operandTypes.numMult);
+                    curNM = copyUsedOperands.LastIndexOf(operandTypes.numVar);
                 }
-                 //indices of operandTypes should match up with those in usedOperators
-                List<string> operatorsWithNMVM = new List<string>();
+                //indices of operandTypes should match up with those in usedOperators
+                List<string> operatorsWithNV = new List<string>();
                 foreach (int index in indices)
                 {
-                    operatorsWithNMVM.Add(usedOperators.ElementAt(index));
+                    operatorsWithNV.Add(usedOperators.ElementAt(index));
                 }
 
 
                 string denom = getDenominator(splitEqn); //returns "" if not /
-                if (operatorsWithNMVM.Contains("*") || operatorsWithNMVM.Contains("/"))
+                if (operatorsWithNV.Contains("*") || operatorsWithNV.Contains("/"))
                 {
                     //check for sqrt in denomiator
                     if (denom.Contains("sqrt"))
@@ -918,22 +980,116 @@ namespace MATT
                     }
                     else
                     {
+                        bool numVarAddSub = false;
+                        if (operatorsWithNV.Contains("+") || operatorsWithNV.Contains("-"))
+                        {
+                            numVarAddSub = true;
+                            LinkLabel remove = addLinkLabel("Remove Constants", "RemoveConstants", linkLabelCount++);
+                            if (remove == null) linkLabelCount--;
+                            loadInstructions(remove);
+                        }
+                        else
+                        {
+                            //only * or /
+                            if (separatedEqn.Contains("sqrt") && !string.IsNullOrEmpty(denom))
+                            {
+                                LinkLabel ll = addLinkLabel("Manipulating Coefficients", "MultDivNumVar", linkLabelCount++);
+                                if (ll == null) linkLabelCount--;
+                                loadInstructions(ll);
+
+
+                                LinkLabel coef = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
+                                if (coef == null) linkLabelCount--;
+                                loadInstructions(coef);
+                            }
+                        }
+
+                        //numVar with * or / without sqrt in denom
                         if (separatedEqn.Contains("* sqrt"))
                         {
                             LinkLabel coef = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
                             if (coef == null) linkLabelCount--;
                             loadInstructions(coef);
-
-                            LinkLabel sqrt = addLinkLabel("Remove Radicals", "RadicalsEqn", linkLabelCount++);
-                            if (sqrt == null) linkLabelCount--;
-                            loadInstructions(sqrt);
                         }
                         else
                         {
-                            LinkLabel ll = addLinkLabel("Manipulating Coefficients", "MultDivNumVar", linkLabelCount++);
-                            if (ll == null) linkLabelCount--;
-                            loadInstructions(ll);
+                            List<int> degrees = listDegreesR(variable1, separatedEqn);
+                            int highDeg = degrees.Max();
+                            if (degrees.Distinct().Count() == degrees.Max() + 1)
+                            {
+                                //2,1,0 count =3, a term for each degree
+                                if (numVarAddSub && highDeg > 1)// || usedOperandTypes.Contains(operandTypes.numMult))
+                                {
+                                    //numVar operator is + or - NOT / or *
+                                    LinkLabel factor = addLinkLabel("Factoring Polynomial Equations", "Factoring", linkLabelCount++);
+                                    if (factor == null) linkLabelCount--;
+                                    loadInstructions(factor);
+                                }
+                                else
+                                {
+                                    //3x^2+x/2 need to check for mult of same type of operand
+                                    if (usedOperandTypes.Contains(operandTypes.varVar) || usedOperandTypes.Contains(operandTypes.multMult))
+                                    {
+                                        LinkLabel pull = addLinkLabel("Factoring Out a Common Term", "PullOutAnX", linkLabelCount++);
+                                        if (pull == null) linkLabelCount--;
+                                        loadInstructions(pull);
+                                    }
+                                    else
+                                    {
+                                        //has numVar with * or /; does not have varVar, numNum, or multMult which means could have numMult or varMult
+                                        //x/2
+                                        if (splitEqn.Length == 3)
+                                        {
+                                            //just one numVar operation
+                                            LinkLabel mult = addLinkLabel("Remove Constants in the Denominator", "RemoveDenomConst", linkLabelCount++);
+                                            if (mult == null) linkLabelCount--;
+                                            loadInstructions(mult);
+                                        }
+                                        else
+                                        {
+                                            //3(x-1)+x/3
+                                            LinkLabel mult = addLinkLabel("Manipulating Coefficients", "MultDivNumVar", linkLabelCount++);
+                                            if (mult == null) linkLabelCount--;
+                                            loadInstructions(mult);
+
+                                            LinkLabel coef = addLinkLabel("Remove Constants in the Denominator", "RemoveDenomConst", linkLabelCount++);
+                                            if (coef == null) linkLabelCount--;
+                                            loadInstructions(coef);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                //known: does not have term of each degree; does not have * sqrt; no sqrt denom; has * or / with numVar
+                                //9*x^2+3;  3+2*x^2 but not 3+2x^2;   3x/2 not x/2
+                                //for some reason doesnt come here is no coef...
+                                if (operatorsWithNV.Contains("/"))
+                                {
+                                    LinkLabel ll = addLinkLabel("Manipulating Coefficients", "MultDivNumVar", linkLabelCount++);
+                                    if (ll == null) linkLabelCount--;
+                                    loadInstructions(ll);
+                                }
+
+                                LinkLabel coef = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
+                                if (coef == null) linkLabelCount--;
+                                loadInstructions(coef);
+
+                                if (separatedEqn.Contains(variable1 + "^"))
+                                {
+                                    LinkLabel sqrtBoth = addLinkLabel("Removing Exponents", "SqrtBothSides", linkLabelCount++);
+                                    if (sqrtBoth == null) linkLabelCount--;
+                                    loadInstructions(sqrtBoth);
+                                }
+                            }
                         }
+                    }
+
+                    if (separatedEqn.Contains("sqrt"))
+                    {
+                        LinkLabel sqrt = addLinkLabel("Remove Radicals", "RadicalsEqn", linkLabelCount++);
+                        if (sqrt == null) linkLabelCount--;
+                        loadInstructions(sqrt);
                     }
                 }
                 else
@@ -968,34 +1124,62 @@ namespace MATT
                         }
                         else
                         {
-                            string otherTerms; //needs work
+                            string afterSqrt = woSqrt.Substring(woSqrt.IndexOf(")") + 2); //add everything after closing paren except space
+                            bool multiplication = false;
+                            bool addSub = false;
                             if (sqrtIndex > 0)
                             {
-                                otherTerms = separatedEqn.Substring(0, sqrtIndex-1);//everything before sqrt except one space
-                                otherTerms += woSqrt.Substring(woSqrt.IndexOf(")")+2); //add everything after closing paren except space
-                                //need to look at other functions
-                                string[] otherSplit = otherTerms.Split(' ');
-                                //foreach (string oterm in otherSplit)
-                                //{
-                                //    if (oterm.Length == 2)
-                                //    {
-                                //        if (oterm[0].Equals("+") && oterm[1].Equals("-"))
-                                //        {
-                                            
-                                //        }
-                                //    }
-                                //}
-                            }
-                            else
-                            {
-                                otherTerms = woSqrt.Substring(woSqrt.IndexOf(")")+1);
+                                //need to look at function before
+                                if (separatedEqn.Contains("* sqrt"))
+                                {
+                                    //coef
+                                    multiplication = true;
+                                }
+                                else if (separatedEqn.Contains("+ sqrt") || separatedEqn.Contains("- sqrt"))
+                                {
+                                    //constant or variable? move everything to the other side before squaring?
+                                    addSub = true;
+                                }
                             }
 
+                            //look at function after
+                            if (afterSqrt.Length > 0)
+                            {
+                                char opAfterSqrt = afterSqrt[0];
+                                if (opAfterSqrt.Equals('*'))
+                                {
+                                    multiplication = true;
+
+                                }
+                                else if (opAfterSqrt.Equals('+') || opAfterSqrt.Equals('-'))
+                                {
+                                    //constant or variable? move everything to the other side before squaring?
+                                    addSub = true;
+
+                                }
+                            }
+
+                            //instructions for other terms
+                            if (multiplication)
+                            {
+                                LinkLabel coef = addLinkLabel("Remove Coefficients", "DivideBothSides", linkLabelCount++);
+                                if (coef == null) linkLabelCount--;
+                                loadInstructions(coef);
+                            }
+
+                            if (addSub)
+                            {
+                                instructionsRTB.Text += "Move all the terms to the opposite side of the radical before raising both"
+                                    + " sides of the equation to the reciprical of the power of the radical.";
+                                LinkLabel terms = addLinkLabel("Move All Terms to Other Side", "RemoveConstants", linkLabelCount++);
+                                if (terms == null) linkLabelCount--;
+                                loadInstructions(terms);
+                            }
+
+                            //remove the sqrt
                             LinkLabel sqrt = addLinkLabel("Remove Radicals", "RadicalsEqn", linkLabelCount++);
                             if (sqrt == null) linkLabelCount--;
                             loadInstructions(sqrt);
-
-                            linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, otherTerms);
                         }
 
                     }
@@ -1004,13 +1188,13 @@ namespace MATT
                         //check for simplification or else foil
                         string expBase = separatedEqn.Remove(separatedEqn.IndexOf(")^"));
                         int startParenIndex;
-                        for (startParenIndex = expBase.Length-1; startParenIndex > 0; startParenIndex--)
+                        for (startParenIndex = expBase.Length - 1; startParenIndex > 0; startParenIndex--)
                         {
                             char cur = expBase[startParenIndex];
                             if (cur.Equals("("))
                                 break;
                         }
-                        expBase = expBase.Substring(startParenIndex+1);
+                        expBase = expBase.Substring(startParenIndex + 1);
                         string sepExpBase;
                         bool multBase = separateMultTerms(expBase, variable1, out sepExpBase);
                         //we know it has / or *, if it also has + or - then we need to foil
@@ -1053,9 +1237,19 @@ namespace MATT
                     {
                         //3x + 9/x + 1
                         //any numVar with division and another variable term
-                        LinkLabel combine = addLinkLabel("Combine Like Terms", "CombineLikeTerms", linkLabelCount++);
-                        if (combine == null) linkLabelCount--;
-                        loadInstructions(combine);
+                        List<int> degrees = listDegreesR(variable1, separatedEqn);
+                        if (degrees.Count != degrees.Distinct().Count())
+                        {
+                            LinkLabel combine = addLinkLabel("Combine Like Terms", "CombineLikeTerms", linkLabelCount++);
+                            if (combine == null) linkLabelCount--;
+                            loadInstructions(combine);
+                        }
+                        else
+                        {
+                            LinkLabel pull = addLinkLabel("Factor-Out a Common Term", "PullOutAnX", linkLabelCount++);
+                            if (pull == null) linkLabelCount--;
+                            loadInstructions(pull);
+                        }
                     }
                 }
             }
@@ -1064,7 +1258,11 @@ namespace MATT
             if (usedOperandTypes.Contains(operandTypes.numMult) || usedOperandTypes.Contains(operandTypes.varMult))
             {
                 //make a list of the indices of numMult operations
-                List<operandTypes> copyUsedOperands = usedOperandTypes;
+                List<operandTypes> copyUsedOperands = new List<operandTypes>();
+                foreach (operandTypes ot in usedOperandTypes)
+                {
+                    copyUsedOperands.Add(ot);
+                }
                 List<int> indices = new List<int>(); //list of indexes of numMult in usedOperandTypes
                 int curNM = copyUsedOperands.LastIndexOf(operandTypes.numMult);
                 while (curNM != -1)
@@ -1074,7 +1272,11 @@ namespace MATT
                     curNM = copyUsedOperands.LastIndexOf(operandTypes.numMult);
                 }
                 //add to list the indices of varMult operations
-                copyUsedOperands = usedOperandTypes; //reset the list to check for varMult
+                copyUsedOperands.Clear(); //reset the list to check for varMult
+                foreach (operandTypes ot in usedOperandTypes)
+                {
+                    copyUsedOperands.Add(ot);
+                }
                 int curVM = copyUsedOperands.LastIndexOf(operandTypes.varMult);
                 while (curVM != -1)
                 {
@@ -1134,8 +1336,14 @@ namespace MATT
                         }
                     }
 
+                    bool multDegreesSepEqn = false;
+                    int highestDegreeSepEqn;
+                    List<int> degreesSepEqn = listDegreesR(variable1, separatedEqn);
+                    if (degreesSepEqn.Distinct().Count() > 1) multDegreesSepEqn = true;
+                    highestDegreeSepEqn = degreesSepEqn.Max();
+
                     //need to add further instructions, remove constants or factor
-                    if (splitEqn.Length == 3) //just the mult, op, and var/num
+                    if (splitEqn.Length == 3) //just the mult, op, and var/num ie (3x/7)+3
                     {
                         //if only one has a variable (numMult)
                         if (splitEqn.ElementAt(0).Contains(variable1) ^ splitEqn.ElementAt(2).Contains(variable1))
@@ -1156,7 +1364,7 @@ namespace MATT
                             {
                                 controls.Add(c);
                             }
-                            if(controls.Any(item => item.Tag.Equals("FOIL")))
+                            if (controls.Any(item => item.Tag.Equals("FOIL")))
                             {
                                 foil = true;
                             }
@@ -1173,13 +1381,53 @@ namespace MATT
                             }
                             else
                             {
-                                LinkLabel coef = addLinkLabel("Removing Coefficients", "DivideBothSides", linkLabelCount++);
-                                if (coef == null) linkLabelCount--;
-                                loadInstructions(coef);
-
                                 LinkLabel remove = addLinkLabel("Remove Contant Terms", "RemoveConstants", linkLabelCount++);
                                 if (remove == null) linkLabelCount--;
                                 loadInstructions(remove);
+
+                                if (!controls.Any(item => item.Tag.Equals("RemoveDenomConst")))
+                                {
+                                    //need to make sure actually has coef ie (x+3)-9; (x+3)-9x doesnt get here but (x+3x)-9 does
+                                    string[] varSplit = separatedEqn.Split(variable1);
+                                    bool multVars = varSplit.Count() > 2;
+                                    bool hasCoef = false;
+                                    if (!multVars)
+                                    {
+                                        for (int i = 0; i < varSplit.Length - 1; i++)//the last one is what is after the var, not before
+                                        {
+                                            string beforeVar = varSplit[i];
+                                            beforeVar = beforeVar.Trim();
+                                            char lastChar = beforeVar.ElementAt(beforeVar.Length - 1);
+                                            if (lastChar.Equals('*'))
+                                            {
+                                                lastChar = beforeVar.ElementAt(beforeVar.Length - 3);//move to the operand -> # *
+                                            }
+                                            double result;
+                                            hasCoef = double.TryParse(lastChar + "", out result);
+                                        }
+                                    }
+
+                                    //if has coef or mult x's
+                                    if (multVars || hasCoef)
+                                    {
+                                        LinkLabel coef = addLinkLabel("Removing Coefficients", "DivideBothSides", linkLabelCount++);
+                                        if (coef == null) linkLabelCount--;
+                                        loadInstructions(coef);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (multDegreesSepEqn)
+                    {
+                        double totTermsToFactor = 2 * highestDegreeSepEqn + 1;
+                        if (splitEqn.Length == totTermsToFactor)
+                        {
+                            //if (degreesSepEqn.Distinct().Count() >= highestDegreeSepEqn + 1) //(hopefully)at least a term for each degree?
+                            {
+                                LinkLabel factor = addLinkLabel("Factoring Polynomials", "Factoring", linkLabelCount++);
+                                if (factor == null) linkLabelCount--;
+                                loadInstructions(factor);
                             }
                         }
                     }
@@ -1189,7 +1437,11 @@ namespace MATT
             if (usedOperandTypes.Contains(operandTypes.multMult))
             {
                 //make a list of the indices of multMult operations
-                List<operandTypes> copyUsedOperands = usedOperandTypes;
+                List<operandTypes> copyUsedOperands = new List<operandTypes>();
+                foreach (operandTypes ot in usedOperandTypes)
+                {
+                    copyUsedOperands.Add(ot);
+                }
                 List<int> indices = new List<int>(); //list of indexes of varVar in usedOperandTypes
                 int curVV = copyUsedOperands.LastIndexOf(operandTypes.multMult);
                 while (curVV != -1)
@@ -1295,8 +1547,8 @@ namespace MATT
                         if (!multiSubTerm)
                         {
                             //get value of exponent in this single term
-                            int indexOfCarat = term.IndexOf("^");
-                            string strExp = term.Substring(indexOfCarat + 1, term.Length - indexOfCarat - 1);
+                            int indexOfCarat = separatedTerm.IndexOf("^");
+                            string strExp = separatedTerm.Substring(indexOfCarat + 1, separatedTerm.Length - indexOfCarat - 1);
 
                             string separatedExp;
                             bool multTermExp = separateMultTerms(strExp, variable1, out separatedExp);
@@ -1357,354 +1609,176 @@ namespace MATT
                 {
                     switch (determineType(givenEqn, out variable1, out variable2))
                     {
-//-------------NO VARIABLES-----------------------------------------------------------------------------------------------------------------------------------
                         case equationType.noVar:
-                            bool multipleTerms = separateMultTerms(givenEqn, ' ', out givenEqn);
-                            if (multipleTerms)
-                            {
-                                //add order of operations first then check for other stuff
-                                LinkLabel ooo = addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
-                                if (ooo == null) linkLabelCount--;
-                                loadInstructions(ooo);
-                            }
-                            //if they user entered just a number
-                            double parsedNum;
-                            if (double.TryParse(givenEqn, out parsedNum))
-                            {
-                                //Add link label solutions
-                                LinkLabel sciNot = addLinkLabel("Write in Scientific Notation", "SciNotation", linkLabelCount++);
-                                addLinkLabel("Draw a Factor Tree", "FactorTree", linkLabelCount++);
-                                if (sciNot == null) linkLabelCount--;
-                                //Load instructions for Scientific Notation
-                                loadInstructions(sciNot);
-                            }
-                            else
-                            {
-                                if (givenEqn.Contains('!'))
-                                {
-                                    //if entered a single number with a bang
-                                    //remove bang
-                                    string strRemovedBang = givenEqn.Remove(givenEqn.IndexOf('!'));
-                                    //remove parens if possible
-                                    if (strRemovedBang.ElementAt(0).Equals('(') && strRemovedBang.ElementAt(strRemovedBang.Length - 1).Equals(')'))
-                                    {
-                                        string withoutParens = strRemovedBang.Remove(0, 1);
-                                        withoutParens = withoutParens.Remove(withoutParens.Length - 1, 1);
-                                        if (!(withoutParens.Contains('(') || withoutParens.Contains(')')))
-                                        {
-                                            strRemovedBang = withoutParens;
-                                        }
-                                    }
-                                    //check if given was one number
-                                    if (double.TryParse(strRemovedBang, out parsedNum))
-                                    {
-                                        LinkLabel factorial = addLinkLabel("Evaluating Factorial", "Factorial", linkLabelCount++);
-                                        loadInstructions(factorial);
-                                    }
-                                    else
-                                    {
-                                        //include order of operations
-                                        LinkLabel factorial = addLinkLabel("Evaluating Factorial", "Factorial", linkLabelCount++);
-                                        if (factorial == null) linkLabelCount--;
-                                        LinkLabel ooo = addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
-                                        if (ooo == null) linkLabelCount--;
-                                        loadInstructions(factorial);
-                                    }
-                                }
-
-                                //Check for absolute value
-                                if (givenEqn.Contains("abs") || givenEqn.Contains('|'))
-                                {
-                                    LinkLabel absLink = addLinkLabel("Absolute Value", "AbsoluteValue", linkLabelCount++);
-                                    if (absLink == null) linkLabelCount--;
-                                    loadInstructions(absLink);
-                                }
-
-                                //Check for sqrt
-                                if (givenEqn.Contains("sqrt"))
-                                {
-                                    LinkLabel sqrt = addLinkLabel("Simplifying Radicals", "Radicals", linkLabelCount++);
-                                    if (sqrt == null) linkLabelCount--;
-                                    loadInstructions(sqrt);
-                                }
-
-                                if (givenEqn.Contains('^'))
-                                {
-                                    //if entered a number raised to a power
-                                    //check exponent for terms, pos, or neg
-                                    string exponent = givenEqn.Substring(givenEqn.IndexOf('^') + 1, givenEqn.Length - givenEqn.IndexOf('^') - 1);
-                                    bool multiTermExp = separateMultTerms(exponent, variable1, out exponent);
-
-                                    if (multiTermExp)
-                                    {
-                                        //add order of operations
-                                        addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
-                                        //need to check for fractions
-                                        if (exponent.Contains('/'))
-                                        {
-                                            LinkLabel fracExp = addLinkLabel("Evaluating Fractional Exponents", "FractionExponent", linkLabelCount++);
-                                            if (fracExp == null) linkLabelCount--;
-                                            LinkLabel rad = addLinkLabel("Simplifying Radicals", "Radicals", linkLabelCount++);
-                                            if (rad == null) linkLabelCount--;
-                                            loadInstructions(fracExp);
-                                        }
-                                        else
-                                        {
-                                            LinkLabel exp = addLinkLabel("Evaluating Exponents", "SimpleExponent", linkLabelCount++);
-                                            if (exp == null) linkLabelCount--;
-                                            loadInstructions(exp);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        //default if it includes a ^ show positive exponent
-                                        LinkLabel exp = addLinkLabel("Evaluating Exponents", "SimpleExponent", linkLabelCount++);
-                                        if (exp == null) linkLabelCount--;
-                                        loadInstructions(exp);
-                                    }
-                                }
-                            }
+                            caseNoVariables(ref givenEqn, ref linkLabelCount, variable1);
                             insertPictures();
                             break;
-//--------------ONE VARIABLE---------------------------------------------------------------------------------------------------------------------------
                         case equationType.oneVar:
-                            string separatedEqn;
-                            multipleTerms = separateMultTerms(givenEqn, variable1, out separatedEqn);
-                            bool multDegrees;
-                            double degree = findHighestDegree(givenEqn, variable1, out multDegrees);
-                            bool sentToOneVarMult = false;
-
-                            //find operators involved
-                            List<string> includedOps = new List<string>();
-                            List<string> operators = new List<string>();
-                            string[] opsArray = { "=", "+", "-", "/", "*", "^", "|", "!" };
-                            operators.AddRange(opsArray);
-                            foreach (char c in separatedEqn)
-                            {
-                                if (operators.Contains(c.ToString()))
-                                {
-                                    if (!includedOps.Contains(c.ToString()))
-                                    {
-                                        includedOps.Add(c.ToString());
-                                    }
-                                }
-                            }
-
-                            if (separatedEqn.Contains("sqrt"))
-                            {
-                                includedOps.Add("sqrt");
-                            }
-                            if (separatedEqn.Contains("abs"))
-                            {
-                                includedOps.Add("abs");
-                            }
-
-                            if (!multipleTerms)
-                            {
-                                //if not given = #, then set equal to zero to find roots
-                                if (!includedOps.Contains("="))
-                                {
-                                    LinkLabel roots = addLinkLabel("Finding the Roots of an Equation", "FindRoots", linkLabelCount++);
-                                    if (roots == null) linkLabelCount--;
-                                    loadInstructions(roots);
-
-                                    givenEqn += " = 0";
-                                    includedOps.Add("=");
-                                }
-
-                                if (includedOps.Contains("sqrt"))
-                                {
-                                    //must be root(everything) or else would be mult terms
-                                    if (givenEqn.Contains('='))
-                                    {
-                                        LinkLabel sqrt = addLinkLabel("Solving Equations with Radicals", "RadicalsEqn", linkLabelCount++);
-                                        if (sqrt == null) linkLabelCount--;
-                                        loadInstructions(sqrt);
-
-                                        //need to remove sqrt and plun into oneVarMultTerms section
-
-                                        string removeSqrt = separatedEqn.Substring(separatedEqn.IndexOf("sqrt") + 4, separatedEqn.Length - 4);
-                                        bool multiTermBase = separateMultTerms(removeSqrt, variable1, out removeSqrt);
-
-                                        sentToOneVarMult = true;
-                                        linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeSqrt);
-                                    }
-                                }
-
-                                else if (includedOps.Contains("^"))
-                                {
-                                    //must be (everything)^# or would be mult terms
-                                    //check for fractional exponent
-                                    string exponent = separatedEqn.Substring(separatedEqn.LastIndexOf('^') + 1, separatedEqn.Length - separatedEqn.LastIndexOf('^') - 1);
-                                    bool multiTermExp = separateMultTerms(exponent, variable1, out exponent);
-
-                                    string removeExp = separatedEqn.Remove(separatedEqn.LastIndexOf('^'));
-                                    bool multiTermExpBase = separateMultTerms(removeExp, variable1, out removeExp);
-
-                                    if (multiTermExp)
-                                    {
-                                        //need to check for fractions
-                                        if (exponent.Contains('/'))
-                                        {
-                                            LinkLabel fracExp = addLinkLabel("Evaluating Fractional Exponents", "FractionExponent", linkLabelCount++);
-                                            if (fracExp == null) linkLabelCount--;
-                                            loadInstructions(fracExp);
-                                            //must be root(everything) or else would be mult terms
-                                            LinkLabel sqrt = addLinkLabel("Solving Equations with Radicals", "RadicalsEqn", linkLabelCount++);
-                                            if (sqrt == null) linkLabelCount--;
-                                            loadInstructions(sqrt);
-
-                                            //remove the sqrt/power and then plug into oneVarMultTerms section
-                                            sentToOneVarMult = true;
-                                            linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeExp);
-                                        }
-                                        else
-                                        {
-                                            //add order of operations
-                                            addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
-                                        }
-                                    }
-
-                                    //if given polynomial to a power
-                                    if (multiTermExpBase)
-                                    {
-                                        bool multiDegrees = false;
-                                        double highestDegreeInBase = findHighestDegree(removeExp, variable1, out multiDegrees);
-                                        List<string> baseOperators = new List<string>();
-                                        if (multiDegrees)
-                                        {
-                                            LinkLabel ll = addLinkLabel("Multiplying Polynomials", "FOIL", linkLabelCount++);
-                                            if (ll == null) linkLabelCount--;
-                                            loadInstructions(ll);
-
-                                            //if (multidegrees)^# (3x^2-x+2x)^2 
-                                            //instruct to foil and then plug the equation into multiTerm section
-                                            sentToOneVarMult = true;
-                                            linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeExp);
-                                        }
-                                        else
-                                        {
-                                            //check if multiple variable terms in the base
-                                            bool multTermsAfterCombining = false;
-                                            int variableTerms = 0;
-                                            foreach (string term in removeExp.Split(' '))
-                                            {
-                                                if (!term.Contains(variable1))
-                                                {
-                                                    if (!operators.Contains(term))
-                                                    {
-                                                        multTermsAfterCombining = true;
-                                                    }
-                                                    else
-                                                    {
-                                                        baseOperators.Add(term);
-                                                    }
-                                                }
-                                                else
-                                                    variableTerms++;
-                                            }
-
-                                            if (variableTerms > 1) // multiple terms with the same degree (in base)
-                                            {
-                                                LinkLabel combine = addLinkLabel("Combining Terms", "CombineLikeTerms", linkLabelCount++);
-                                                if (combine == null) linkLabelCount--;
-                                                loadInstructions(combine);
-                                            }
-
-                                            if (multTermsAfterCombining) //(still) multiple terms in base
-                                            {
-                                                //check if actually foil or if (3x/5)^2
-                                                if ((baseOperators.Distinct().Contains("/") || baseOperators.Contains("*")) && !baseOperators.Contains("+"))
-                                                {
-                                                    //cant check on - b/c of negative numbers
-                                                    if (baseOperators.Contains("*"))
-                                                    {
-                                                        //dont know if it is or numVar or numMult...
-                                                        LinkLabel power = addLinkLabel("Exponents", "SimpleExponent", linkLabelCount++);
-                                                        if (power == null) linkLabelCount--;
-                                                        loadInstructions(power);
-
-                                                        LinkLabel coefRemove = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
-                                                        if (coefRemove == null) linkLabelCount--;
-                                                        loadInstructions(coefRemove);
-                                                    }
-                                                    else if (baseOperators.Contains("/"))
-                                                    {
-                                                        LinkLabel coef = addLinkLabel("Simplify the Coefficient", "MultDivNumVar", linkLabelCount++);
-                                                        if (coef == null) linkLabelCount--;
-                                                        loadInstructions(coef);
-
-                                                        LinkLabel fracPwr = addLinkLabel("Applying Exponents to Fractions", "FracToPower", linkLabelCount++);
-                                                        if (fracPwr == null) linkLabelCount--;
-                                                        loadInstructions(fracPwr);
-
-                                                        LinkLabel coefRemove = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
-                                                        if (coefRemove == null) linkLabelCount--;
-                                                        loadInstructions(coefRemove);
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    LinkLabel ll = addLinkLabel("Expanding Equations with Exponents", "FOIL", linkLabelCount++);
-                                                    if (ll == null) linkLabelCount--;
-                                                    loadInstructions(ll);
-                                                }
-
-                                                //combine like terms?
-                                                //LinkLabel solve = addLinkLabel("Combine Like Terms", "CombineLikeTerms", linkLabelCount++);
-                                                //if (solve == null) linkLabelCount--;
-                                                //loadInstructions(solve);
-
-                                                sentToOneVarMult = true; //dont send to solveOneTerm b/c this is all needed instructions
-                                            }
-                                            else
-                                            {
-                                                //has become power to a power
-                                                LinkLabel pp = addLinkLabel("Raising a Power to a Power", "RaisingAPower", linkLabelCount++);
-                                                if (pp == null) linkLabelCount--;
-                                                loadInstructions(pp);
-                                            }
-                                        }
-                                    }// end multi term base
-                                    else
-                                    {
-                                        if (removeExp.Contains("^"))
-                                        {
-                                            //power to a power
-                                            LinkLabel pp = addLinkLabel("Raising a Power to a Power", "RaisingAPower", linkLabelCount++);
-                                            if (pp == null) linkLabelCount--;
-                                            loadInstructions(pp);
-                                        }
-                                    }
-                                }// end if ^
-
-                                //solving equations single term equations
-
-                                if (!sentToOneVarMult)
-                                {
-                                    linkLabelCount = solveOneVarOneTerm(separatedEqn, variable1, linkLabelCount);
-                                }
-                            }// end if !multipleTerms
-                            else
-                            {
-                                //instructionsRTB.Text = "one var, mult terms";
-                                sentToOneVarMult = true;
-                                linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, separatedEqn);
-                            }
-
+                            caseOneVariable(ref givenEqn, ref linkLabelCount, variable1);
                             insertPictures();
                             break;
                         case equationType.twoVar:
-                            instructionsRTB.Text = "You entered a two variable equation";
-                            separateMultTerms(givenEqn, variable1, out givenEqn);
-                            instructionsRTB.Text += givenEqn + "\n";
-                            instructionsRTB.Text += "V1: " + variable1 + '\n' + "V2: " + variable2;
+                            if (givenEqn.Contains("x"))
+                                variable1 = 'x';
+                            if (givenEqn.Contains('y'))
+                                variable2 = 'y';
+
+                            //if shorter side of equation isnt just y= or x= then subtract it from the rhs
+                            //ex: y^2 + 1 = x^2 + 8  -->  x^2 + 8 - (y^2+1)
+                            if (givenEqn.Contains('='))
+                            {
+                                string[] splitOnEquals = givenEqn.Split('=');
+                                if (splitOnEquals.Length > 2)
+                                {
+                                    instructionsRTB.Text = "Oh no! You entered more than one equals sign (=). Please re-enter your equation.\n\n-Matt";
+                                    break; // abort
+                                }
+                                string lhs = splitOnEquals[0].Trim();
+                                string rhs = splitOnEquals[1].Trim();
+
+                                //make rhs the longer term
+                                if (lhs.Length > rhs.Length)
+                                {
+                                    string temp = rhs;
+                                    rhs = lhs;
+                                    lhs = temp;
+                                }
+
+                                //if (lhs.Length > 1)
+                                {
+                                    //more than just y=, add -lhs onto the end of rhs
+                                    //need parens b/c need to distribute neg.
+                                    givenEqn = rhs + "- (" + lhs + ")";
+                                }
+                            }
+
+                            //info wrt variable 1
+                            string separatedEqnX;
+                            bool multDegX = separateMultTerms(givenEqn, variable1, out separatedEqnX);
+                            List<int> degreesX = listDegreesR(variable1, separatedEqnX);
+                            int highestDegreeX = degreesX.Max();
+
+                            //info wrtY (variable2)
+                            string separatedEqnY;
+                            bool multDegY = separateMultTerms(givenEqn, variable2, out separatedEqnY);
+                            List<int> degreesY = listDegreesR(variable2, separatedEqnY);
+                            int highestDegreeY = degreesY.Max();
+
+                            if (highestDegreeX == 1 && highestDegreeY == 1)
+                            {
+                                //linear equation
+                                //if (!(givenEqn.Contains("y=") || givenEqn.Contains("y =") || givenEqn.Contains("=y")))
+                                if(degreesY.Count > 2) //more than just the x term and the y term
+                                {
+                                    //solve for y, put it in y=mx+b form
+                                    instructionsRTB.Text += "Solve the equation for the second variable in order to put in slope-intercept form";
+                                    //move everything to the other side and get rid of coef
+                                    LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
+                                    if (solve == null) linkLabelCount--;
+                                    loadInstructions(solve);
+                                }
+
+                                LinkLabel mxb = addLinkLabel("Graphing an Equation in Slope-Intercept Form", "GraphYEq", linkLabelCount++);
+                                if (mxb == null) linkLabelCount--;
+                                loadInstructions(mxb);
+
+                                //other instructions for linear equations
+                                LinkLabel standard = addLinkLabel("Put Equation into Standard Form", "StandardForm", linkLabelCount++);
+                                if (standard == null) linkLabelCount--;
+
+                                LinkLabel graph = addLinkLabel("Graphing a Linear Equation", "GraphLinear", linkLabelCount++);
+                                if (graph == null) linkLabelCount--;
+                            }
+                            else if (highestDegreeX == 2 && highestDegreeY == 2)
+                            {
+                                //circle or ellipse or hyperbola
+
+                                //if has ^2 term and ^1 term then prob. need to factor to put in form of equation
+                                if (degreesX.Contains(1) || degreesY.Contains(1))
+                                {
+                                    LinkLabel factor = addLinkLabel("Factor to Find Center", "Factoring", linkLabelCount++);
+                                    if (factor == null) linkLabelCount--;
+                                    loadInstructions(factor);
+                                }
+
+                                if (separatedEqnX.Contains(" / ") || separatedEqnX.Contains("^2/") || separatedEqnX.Contains("^2)/"))
+                                {//need to make sure division is right (not a fraction)
+
+                                    // + ellipse
+                                    if (separatedEqnX.Contains(" + ")) // equation has a spaced +
+                                    {
+                                        LinkLabel ellipse = addLinkLabel("The Equation of an Ellipse", "EllipseEqn", linkLabelCount++);
+                                        if (ellipse == null) linkLabelCount--;
+                                        loadInstructions(ellipse);
+                                    }
+                                    else
+                                    {
+                                        //- hyperbola
+                                        LinkLabel hyp = addLinkLabel("The Equation of a Hyperbola", "Hyperbola", linkLabelCount++);
+                                        if (hyp == null) linkLabelCount--;
+                                        loadInstructions(hyp);
+                                    }
+                                }
+                                else
+                                {
+                                    //circle
+                                    LinkLabel cir = addLinkLabel("The Equation of a Circle", "CircleEqn", linkLabelCount++);
+                                    if (cir == null) linkLabelCount--;
+                                    loadInstructions(cir);
+                                }
+                            }
+                            else
+                            {
+                                //the degrees mismatch. not 1,1 or 2,2
+                                //Vertical Parabola
+                                if (highestDegreeX == 2 && highestDegreeY == 1)
+                                {
+                                    //y=x^2 , y = 3x^2+5x-7
+                                    if (degreesX.Contains(1))
+                                    {
+                                        LinkLabel factor = addLinkLabel("Factor to Find Vertex", "Factoring", linkLabelCount++);
+                                        if (factor == null) linkLabelCount--;
+                                        loadInstructions(factor);
+                                    }
+                                    LinkLabel par = addLinkLabel("Graphing a Parabola", "VParabola", linkLabelCount++);
+                                    if (par == null) linkLabelCount--;
+                                    loadInstructions(par);
+                                    
+                                }
+                                else
+                                {
+                                    //parabolas opening left or right
+                                    if (highestDegreeY == 2 && highestDegreeX == 1)//x=y^2
+                                    {
+                                        LinkLabel par = addLinkLabel("Graphing a Parabola", "HParabola", linkLabelCount++);
+                                        if (par == null) linkLabelCount--;
+                                        loadInstructions(par);
+                                    }
+                                    else
+                                    {
+                                        instructionsRTB.Text = "Pick a topic from below to view.";
+
+                                        LinkLabel intercepts = addLinkLabel("Finding X and Y Intercepts", "Intercepts", linkLabelCount++);
+                                        if (intercepts == null) linkLabelCount--;
+
+                                        //move everything to the other side and get rid of coef
+                                        LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
+                                        if (solve == null) linkLabelCount--;
+
+                                        LinkLabel graph = addLinkLabel("Graphing a Non-Linear Equation", "GraphNonLinear", linkLabelCount++);
+                                        if (graph == null) linkLabelCount--;
+                                    }
+                                }
+                            }
+
+                            insertPictures();
                             break;
                         case equationType.multEqn:
-                            instructionsRTB.Text = "You entered multiple equations";
-                            separateMultTerms(givenEqn, variable1, out givenEqn);
-                            instructionsRTB.Text += givenEqn + "\n";
-                            instructionsRTB.Text += "V1: " + variable1 + '\n' + "V2: " + variable2;
+                            LinkLabel mult = addLinkLabel("Solving Systems of Equations", "MultEqn", linkLabelCount++);
+                            if (mult == null) linkLabelCount--;
+                            loadInstructions(mult);
+
+                            insertPictures();
                             break;
                         default:
                             instructionsRTB.Text = "Sorry, I don't recognize the problem you entered. Make sure you"
@@ -1717,6 +1791,342 @@ namespace MATT
             catch (Exception ex)
             {
                 instructionsRTB.Text = "There was an error:\n\n" + ex.Message;
+            }
+        }
+
+        private void caseOneVariable(ref string givenEqn, ref int linkLabelCount, char variable1)
+        {
+            string separatedEqn;
+            bool mT = separateMultTerms(givenEqn, variable1, out separatedEqn);
+            bool multDegrees;
+            double degree = findHighestDegree(givenEqn, variable1, out multDegrees);
+            bool sentToOneVarMult = false;
+
+            //find operators involved
+            List<string> includedOps = new List<string>();
+            List<string> operators = new List<string>();
+            string[] opsArray = { "=", "+", "-", "/", "*", "^", "|", "!" };
+            operators.AddRange(opsArray);
+            foreach (char c in separatedEqn)
+            {
+                if (operators.Contains(c.ToString()))
+                {
+                    if (!includedOps.Contains(c.ToString()))
+                    {
+                        includedOps.Add(c.ToString());
+                    }
+                }
+            }
+
+            if (separatedEqn.Contains("sqrt"))
+            {
+                includedOps.Add("sqrt");
+            }
+            if (separatedEqn.Contains("abs"))
+            {
+                includedOps.Add("abs");
+            }
+
+            if (!mT)
+            {
+                //if not given = #, then set equal to zero to find roots
+                if (!includedOps.Contains("="))
+                {
+                    LinkLabel roots = addLinkLabel("Finding the Roots of an Equation", "FindRoots", linkLabelCount++);
+                    if (roots == null) linkLabelCount--;
+                    loadInstructions(roots);
+
+                    givenEqn += " = 0";
+                    includedOps.Add("=");
+                }
+
+                if (includedOps.Contains("sqrt"))
+                {
+                    //must be root(everything) or else would be mult terms
+                    if (givenEqn.Contains('='))
+                    {
+                        LinkLabel sqrt = addLinkLabel("Solving Equations with Radicals", "RadicalsEqn", linkLabelCount++);
+                        if (sqrt == null) linkLabelCount--;
+                        loadInstructions(sqrt);
+
+                        //need to remove sqrt and plun into oneVarMultTerms section
+
+                        string removeSqrt = separatedEqn.Substring(separatedEqn.IndexOf("sqrt") + 4, separatedEqn.Length - 4);
+                        bool multiTermBase = separateMultTerms(removeSqrt, variable1, out removeSqrt);
+
+                        sentToOneVarMult = true;
+                        linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeSqrt);
+                    }
+                }
+
+                else if (includedOps.Contains("^"))
+                {
+                    //must be (everything)^# or would be mult terms
+                    //check for fractional exponent
+                    string exponent = separatedEqn.Substring(separatedEqn.LastIndexOf('^') + 1, separatedEqn.Length - separatedEqn.LastIndexOf('^') - 1);
+                    bool multiTermExp = separateMultTerms(exponent, variable1, out exponent);
+
+                    string removeExp = separatedEqn.Remove(separatedEqn.LastIndexOf('^'));
+                    bool multiTermExpBase = separateMultTerms(removeExp, variable1, out removeExp);
+
+                    if (multiTermExp)
+                    {
+                        //need to check for fractions
+                        if (exponent.Contains('/'))
+                        {
+                            LinkLabel fracExp = addLinkLabel("Evaluating Fractional Exponents", "FractionExponent", linkLabelCount++);
+                            if (fracExp == null) linkLabelCount--;
+                            loadInstructions(fracExp);
+                            //must be root(everything) or else would be mult terms
+                            LinkLabel sqrt = addLinkLabel("Solving Equations with Radicals", "RadicalsEqn", linkLabelCount++);
+                            if (sqrt == null) linkLabelCount--;
+                            loadInstructions(sqrt);
+
+                            //remove the sqrt/power and then plug into oneVarMultTerms section
+                            sentToOneVarMult = true;
+                            linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeExp);
+                        }
+                        else
+                        {
+                            //add order of operations
+                            addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
+                        }
+                    }
+
+                    //if given polynomial to a power
+                    if (multiTermExpBase)
+                    {
+                        bool multiDegrees = false;
+                        double highestDegreeInBase = findHighestDegree(removeExp, variable1, out multiDegrees);
+                        List<string> baseOperators = new List<string>();
+                        if (multiDegrees)
+                        {
+                            LinkLabel ll = addLinkLabel("Multiplying Polynomials", "FOIL", linkLabelCount++);
+                            if (ll == null) linkLabelCount--;
+                            loadInstructions(ll);
+
+                            //if (multidegrees)^# (3x^2-x+2x)^2 
+                            //instruct to foil and then plug the equation into multiTerm section
+                            sentToOneVarMult = true;
+                            linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, removeExp);
+                        }
+                        else
+                        {
+                            //check if multiple variable terms in the base
+                            bool multTermsAfterCombining = false;
+                            int variableTerms = 0;
+                            foreach (string term in removeExp.Split(' '))
+                            {
+                                if (!term.Contains(variable1))
+                                {
+                                    if (!operators.Contains(term))
+                                    {
+                                        multTermsAfterCombining = true;
+                                    }
+                                    else
+                                    {
+                                        baseOperators.Add(term);
+                                    }
+                                }
+                                else
+                                    variableTerms++;
+                            }
+
+                            if (variableTerms > 1) // multiple terms with the same degree (in base)
+                            {
+                                LinkLabel combine = addLinkLabel("Combining Terms", "CombineLikeTerms", linkLabelCount++);
+                                if (combine == null) linkLabelCount--;
+                                loadInstructions(combine);
+                            }
+
+                            if (multTermsAfterCombining) //(still) multiple terms in base
+                            {
+                                //check if actually foil or if (3x/5)^2
+                                if ((baseOperators.Distinct().Contains("/") || baseOperators.Contains("*")) && !baseOperators.Contains("+"))
+                                {
+                                    //cant check on - b/c of negative numbers
+                                    if (baseOperators.Contains("*"))
+                                    {
+                                        //dont know if it is or numVar or numMult...
+                                        LinkLabel power = addLinkLabel("Exponents", "SimpleExponent", linkLabelCount++);
+                                        if (power == null) linkLabelCount--;
+                                        loadInstructions(power);
+
+                                        LinkLabel coefRemove = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
+                                        if (coefRemove == null) linkLabelCount--;
+                                        loadInstructions(coefRemove);
+                                    }
+                                    else if (baseOperators.Contains("/"))
+                                    {
+                                        LinkLabel coef = addLinkLabel("Simplify the Coefficient", "MultDivNumVar", linkLabelCount++);
+                                        if (coef == null) linkLabelCount--;
+                                        loadInstructions(coef);
+
+                                        LinkLabel fracPwr = addLinkLabel("Applying Exponents to Fractions", "FracToPower", linkLabelCount++);
+                                        if (fracPwr == null) linkLabelCount--;
+                                        loadInstructions(fracPwr);
+
+                                        LinkLabel coefRemove = addLinkLabel("Remove Coefficient", "DivideBothSides", linkLabelCount++);
+                                        if (coefRemove == null) linkLabelCount--;
+                                        loadInstructions(coefRemove);
+                                    }
+                                }
+                                else
+                                {
+                                    LinkLabel ll = addLinkLabel("Expanding Equations with Exponents", "FOIL", linkLabelCount++);
+                                    if (ll == null) linkLabelCount--;
+                                    loadInstructions(ll);
+                                }
+
+                                //combine like terms?
+                                //LinkLabel solve = addLinkLabel("Combine Like Terms", "CombineLikeTerms", linkLabelCount++);
+                                //if (solve == null) linkLabelCount--;
+                                //loadInstructions(solve);
+
+                                sentToOneVarMult = true; //dont send to solveOneTerm b/c this is all needed instructions
+                            }
+                            else
+                            {
+                                //has become power to a power
+                                LinkLabel pp = addLinkLabel("Raising a Power to a Power", "RaisingAPower", linkLabelCount++);
+                                if (pp == null) linkLabelCount--;
+                                loadInstructions(pp);
+                            }
+                        }
+                    }// end multi term base
+                    else
+                    {
+                        if (removeExp.Contains("^"))
+                        {
+                            //power to a power
+                            LinkLabel pp = addLinkLabel("Raising a Power to a Power", "RaisingAPower", linkLabelCount++);
+                            if (pp == null) linkLabelCount--;
+                            loadInstructions(pp);
+                        }
+                    }
+                }// end if ^
+
+                //solving equations single term equations
+
+                if (!sentToOneVarMult)
+                {
+                    linkLabelCount = solveOneVarOneTerm(separatedEqn, variable1, linkLabelCount);
+                }
+            }// end if !multipleTerms
+            else
+            {
+                //instructionsRTB.Text = "one var, mult terms";
+                sentToOneVarMult = true;
+                linkLabelCount = oneVarMultipleTerms(linkLabelCount, variable1, separatedEqn);
+            }
+        }
+
+        private void caseNoVariables(ref string givenEqn, ref int linkLabelCount, char variable1)
+        {
+            bool multipleTerms = separateMultTerms(givenEqn, ' ', out givenEqn);
+            if (multipleTerms)
+            {
+                //add order of operations first then check for other stuff
+                LinkLabel ooo = addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
+                if (ooo == null) linkLabelCount--;
+                loadInstructions(ooo);
+            }
+            //if they user entered just a number
+            double parsedNum;
+            if (double.TryParse(givenEqn, out parsedNum))
+            {
+                //Add link label solutions
+                LinkLabel sciNot = addLinkLabel("Write in Scientific Notation", "SciNotation", linkLabelCount++);
+                addLinkLabel("Draw a Factor Tree", "FactorTree", linkLabelCount++);
+                if (sciNot == null) linkLabelCount--;
+                //Load instructions for Scientific Notation
+                loadInstructions(sciNot);
+            }
+            else
+            {
+                if (givenEqn.Contains('!'))
+                {
+                    //if entered a single number with a bang
+                    //remove bang
+                    string strRemovedBang = givenEqn.Remove(givenEqn.IndexOf('!'));
+                    //remove parens if possible
+                    if (strRemovedBang.ElementAt(0).Equals('(') && strRemovedBang.ElementAt(strRemovedBang.Length - 1).Equals(')'))
+                    {
+                        string withoutParens = strRemovedBang.Remove(0, 1);
+                        withoutParens = withoutParens.Remove(withoutParens.Length - 1, 1);
+                        if (!(withoutParens.Contains('(') || withoutParens.Contains(')')))
+                        {
+                            strRemovedBang = withoutParens;
+                        }
+                    }
+                    //check if given was one number
+                    if (double.TryParse(strRemovedBang, out parsedNum))
+                    {
+                        LinkLabel factorial = addLinkLabel("Evaluating Factorial", "Factorial", linkLabelCount++);
+                        loadInstructions(factorial);
+                    }
+                    else
+                    {
+                        //include order of operations
+                        LinkLabel factorial = addLinkLabel("Evaluating Factorial", "Factorial", linkLabelCount++);
+                        if (factorial == null) linkLabelCount--;
+                        LinkLabel ooo = addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
+                        if (ooo == null) linkLabelCount--;
+                        loadInstructions(factorial);
+                    }
+                }
+
+                //Check for absolute value
+                if (givenEqn.Contains("abs") || givenEqn.Contains('|'))
+                {
+                    LinkLabel absLink = addLinkLabel("Absolute Value", "AbsoluteValue", linkLabelCount++);
+                    if (absLink == null) linkLabelCount--;
+                    loadInstructions(absLink);
+                }
+
+                //Check for sqrt
+                if (givenEqn.Contains("sqrt"))
+                {
+                    LinkLabel sqrt = addLinkLabel("Simplifying Radicals", "Radicals", linkLabelCount++);
+                    if (sqrt == null) linkLabelCount--;
+                    loadInstructions(sqrt);
+                }
+
+                if (givenEqn.Contains('^'))
+                {
+                    //if entered a number raised to a power
+                    //check exponent for terms, pos, or neg
+                    string exponent = givenEqn.Substring(givenEqn.IndexOf('^') + 1, givenEqn.Length - givenEqn.IndexOf('^') - 1);
+                    bool multiTermExp = separateMultTerms(exponent, variable1, out exponent);
+
+                    if (multiTermExp)
+                    {
+                        //add order of operations
+                        addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
+                        //need to check for fractions
+                        if (exponent.Contains('/'))
+                        {
+                            LinkLabel fracExp = addLinkLabel("Evaluating Fractional Exponents", "FractionExponent", linkLabelCount++);
+                            if (fracExp == null) linkLabelCount--;
+                            LinkLabel rad = addLinkLabel("Simplifying Radicals", "Radicals", linkLabelCount++);
+                            if (rad == null) linkLabelCount--;
+                            loadInstructions(fracExp);
+                        }
+                        else
+                        {
+                            LinkLabel exp = addLinkLabel("Evaluating Exponents", "SimpleExponent", linkLabelCount++);
+                            if (exp == null) linkLabelCount--;
+                            loadInstructions(exp);
+                        }
+                    }
+                    else
+                    {
+                        //default if it includes a ^ show positive exponent
+                        LinkLabel exp = addLinkLabel("Evaluating Exponents", "SimpleExponent", linkLabelCount++);
+                        if (exp == null) linkLabelCount--;
+                        loadInstructions(exp);
+                    }
+                }
             }
         }
 

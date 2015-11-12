@@ -122,7 +122,8 @@
             this.instructionsRTB.Name = "instructionsRTB";
             this.instructionsRTB.Size = new System.Drawing.Size(868, 494);
             this.instructionsRTB.TabIndex = 2;
-            this.instructionsRTB.Text = "Hi, I\'m MATT! Enter an equation above to get started.";
+            this.instructionsRTB.Text = "Hi, I\'m MATT! Enter an equation above to get started and I\'ll try to help you wor" +
+    "k through the problem.";
             // 
             // mainForm
             // 
