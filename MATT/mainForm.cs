@@ -16,7 +16,7 @@ namespace MATT
     {
 
         private Dictionary<string, string> instructionDict;
-        enum equationType { noVar, oneVar, twoVar, multEqn, unknown };
+        enum equationType { noVar, oneVar, twoVar, multEqn, trigNoVar, trigVar, unknown };
         enum operandTypes { numNum, numMult, varMult, varVar, multMult, numVar };
 
         public mainForm()
@@ -119,6 +119,63 @@ namespace MATT
                     var2 = v2;
                     return equationType.multEqn;
                 }
+            }
+
+            //check for trig functions
+            string[] trigFunctions = { "sin", "cos", "tan", "cot", "csc", "sec" };
+            bool hasTrig = false;
+            foreach (string function in trigFunctions)
+            {
+                if (enteredEqn.IndexOf(function, StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    hasTrig = true;
+                    break;
+                }
+            }
+            //check for var or noVar, single or multiple terms
+            if (hasTrig)
+            {
+                //replace any Pi values with ~ (tilde)?
+                enteredEqn = enteredEqn.Replace("pi", "~");
+                enteredEqn = enteredEqn.Replace("Pi", "~");
+                enteredEqn = enteredEqn.Replace("PI", "~");
+
+                //need to remove trig functions to tell if has variable
+                foreach (string function in trigFunctions)
+                {
+                    int trigIndex = enteredEqn.IndexOf(function);
+                    while (trigIndex != -1)
+                    {
+                        enteredEqn = enteredEqn.Replace(function, string.Empty);
+                        trigIndex = enteredEqn.IndexOf(function);
+                    }
+                }
+
+                if (enteredEqn.IndexOfAny(alphabet) == -1)
+                    return equationType.trigNoVar;
+
+                //has trig and variables
+
+                //find the first variable and remove all instances
+                char v = enteredEqn[enteredEqn.IndexOfAny(alphabet)];
+                string removedV = enteredEqn.Replace(v, ' ');
+
+                if (removedV.IndexOfAny(alphabet) == -1)
+                {
+                    var1 = v;
+                    var2 = ' ';
+                }
+                else
+                {
+                    char secondVar = removedV[removedV.IndexOfAny(alphabet)];
+                    string removedSecondVar = removedV.Replace(secondVar, ' ');
+                    if (removedSecondVar.IndexOfAny(alphabet) == -1)
+                    {
+                        var1 = v;
+                        var2 = secondVar;
+                    }
+                }
+                return equationType.trigVar;
             }
 
             //find the first variable and remove all instances
@@ -1623,6 +1680,15 @@ namespace MATT
                             if (givenEqn.Contains('y'))
                                 variable2 = 'y';
 
+                            if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
+                            {
+                                LinkLabel radian = addLinkLabel("Converting Radians to Degrees", "RadToDeg", linkLabelCount++);
+                                if (radian == null) linkLabelCount--;
+                                loadInstructions(radian);
+                                insertPictures();
+                                break;
+                            }
+
                             //if shorter side of equation isnt just y= or x= then subtract it from the rhs
                             //ex: y^2 + 1 = x^2 + 8  -->  x^2 + 8 - (y^2+1)
                             if (givenEqn.Contains('='))
@@ -1780,7 +1846,62 @@ namespace MATT
 
                             insertPictures();
                             break;
-                        default:
+                        case equationType.trigNoVar:
+                            instructionsRTB.Text = "Trig with no variables";
+                            //instructions for evaluating trig functions
+                            LinkLabel uc = addLinkLabel("Using the Unit Circle", "UnitCircle", linkLabelCount++);
+                            if (uc == null) linkLabelCount--;
+                            
+                            LinkLabel tt = addLinkLabel("Evaluating Trigonometric Functions", "TriangleTrig", linkLabelCount++);
+                            if (tt == null) linkLabelCount--;
+
+                            if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
+                            {
+                                loadInstructions(uc);
+                            }
+                            else
+                            {
+                                loadInstructions(tt);
+                            }
+
+                            insertPictures();
+                            break;
+                        case equationType.trigVar:
+                            
+                            string separated;
+                            bool multTerms = separateMultTerms(givenEqn, variable1, out separated);
+                            //sin(x) = 1/2 -> UC/Triangle
+                            LinkLabel unit = addLinkLabel("Using the Unit Circle", "UnitCircle", linkLabelCount++);
+                            if (unit == null) linkLabelCount--;
+
+                            if (!multTerms)
+                            {
+                                LinkLabel triangle = addLinkLabel("Evaluating Trigonometric Functions", "TriangleTrig", linkLabelCount++);
+                                if (triangle == null) linkLabelCount--;
+
+                                //if contains pi
+                                if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
+                                {
+                                    loadInstructions(unit);
+                                }
+                                else
+                                {
+                                    loadInstructions(triangle);
+                                }
+                            }
+                            else
+                            {
+                                //has multple terms
+                                //sin(x)^2 + cos(x)^2 -> properties
+                                //sin(x)^2 + cos(30)^2 = 1/2 -> ?
+                                LinkLabel props = addLinkLabel("Trigonometric Properties and Identities", "TrigProps", linkLabelCount++);
+                                if (props == null) linkLabelCount--;
+                                loadInstructions(props);
+                            }
+
+                            insertPictures();
+                            break;
+                        default: // equationType.unknown
                             instructionsRTB.Text = "Sorry, I don't recognize the problem you entered. Make sure you"
                                 + " typed everything in correctly and try to simplify your equation as much as you can"
                                 + " before asking me for help.\n\n-Matt";
