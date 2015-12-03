@@ -16,7 +16,7 @@ namespace MATT
     {
 
         private Dictionary<string, string> instructionDict;
-        enum equationType { noVar, oneVar, twoVar, multEqn, trigNoVar, trigVar, unknown };
+        enum equationType { noVar, oneVar, twoVar, multEqn, trigNoVar, trigVar, log, unknown };
         enum operandTypes { numNum, numMult, varMult, varVar, multMult, numVar };
 
         public mainForm()
@@ -75,7 +75,8 @@ namespace MATT
             var1 = ' ';
             var2 = ' ';
 
-            char[] alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYXabcdefghijklmnopqrstuvwxyz".ToCharArray();
+            //dont include mathematical constants: e, i
+            char[] alphabet = "ABCDFGHJKLMNOPQRSTUVWXYXabcdfghjklmnopqrstuvwxyz".ToCharArray();
             if (enteredEqn.IndexOfAny(alphabet) == -1)
             {
                 //if the string has no letters
@@ -121,6 +122,29 @@ namespace MATT
                 }
             }
 
+            //check for equations with logarithms
+            if (enteredEqn.IndexOf("log", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                enteredEqn.IndexOf("ln", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                //need to set variable 1 and 2
+                //get rid of log and ln so they're not mistaken as variables
+                enteredEqn = enteredEqn.Replace("log", "");
+                enteredEqn = enteredEqn.Replace("ln", "");
+
+                if (enteredEqn.IndexOfAny(alphabet) != -1)
+                {
+                    //has variables
+                    var1 = enteredEqn.ElementAt(enteredEqn.IndexOfAny(alphabet));
+                    enteredEqn = enteredEqn.Replace(var1 + "", "");
+                    if (enteredEqn.IndexOfAny(alphabet) != -1)
+                    {
+                        //has a second variable
+                        var2 = enteredEqn.ElementAt(enteredEqn.IndexOfAny(alphabet));
+                    }
+                }
+                return equationType.log;
+            }
+
             //check for trig functions
             string[] trigFunctions = { "sin", "cos", "tan", "cot", "csc", "sec" };
             bool hasTrig = false;
@@ -135,6 +159,7 @@ namespace MATT
             //check for var or noVar, single or multiple terms
             if (hasTrig)
             {
+                //should this be overall?
                 //replace any Pi values with ~ (tilde)?
                 enteredEqn = enteredEqn.Replace("pi", "~");
                 enteredEqn = enteredEqn.Replace("Pi", "~");
@@ -363,9 +388,10 @@ namespace MATT
             }
 
             //check for multiplying a sqrt ie 9sqrt(x)
-            if (separatedEqn.Contains("sqrt("))
+            string separatedCopy = separatedEqn;
+            while (separatedCopy.Contains("sqrt("))
             {
-                int sqrtIndex = separatedEqn.IndexOf("sqrt(");
+                int sqrtIndex = separatedCopy.LastIndexOf("sqrt(");
                 if (sqrtIndex > 0) //not the first term entered
                 {
                     char beforeSqrt = separatedEqn.ElementAt(sqrtIndex - 1);
@@ -376,6 +402,29 @@ namespace MATT
                         separatedEqn = separatedEqn.Insert(sqrtIndex, "*");
                     }
                 }
+                if (sqrtIndex != -1)
+                    separatedCopy = separatedEqn.Remove(sqrtIndex);
+            }
+
+            //check for multiplying a log ie 3log(x)
+            separatedCopy = separatedEqn;
+            while (separatedCopy.Contains("log(") || separatedCopy.Contains("ln("))
+            {
+                int logIndex = separatedCopy.LastIndexOf("log(");
+                if (logIndex == -1)
+                    logIndex = separatedCopy.LastIndexOf("ln(");
+                if (logIndex > 0) //not the first term entered
+                {
+                    char beforeSqrt = separatedEqn.ElementAt(logIndex - 1);
+                    double num;
+                    if (double.TryParse(beforeSqrt + "", out num))
+                    {
+                        //sqrt was preceded directly by a number ie 9sqrt( -> insert *
+                        separatedEqn = separatedEqn.Insert(logIndex, "*");
+                    }
+                }
+                if (logIndex != -1)
+                    separatedCopy = separatedEqn.Remove(logIndex);
             }
 
             //remove outer parens if unnecessary (eg (-10x+7) )
@@ -414,6 +463,7 @@ namespace MATT
             int parens = 0;
             int index = 0;
             double result;
+            char[] basicOperators = { '+', '-', '*', '/' };
             while (index < separatedEqn.Length)
             {
                 char cur = separatedEqn.ElementAt(index);
@@ -444,7 +494,28 @@ namespace MATT
                     }
                 }
                 else if (cur.Equals(')'))
+                {
+                    //check for mult after parens ie (3x+1)9 -> (3x+1) * 9
+                    //not at the end of the string
+                    if (index != separatedEqn.Length - 1)
+                    {
+                        char afterClose = separatedEqn.ElementAt(index + 1);
+                        if (!afterClose.Equals(' ') && !basicOperators.Contains(afterClose)
+                            && !afterClose.Equals('^') && !afterClose.Equals('!') && !afterClose.Equals(')'))
+                        {
+                            //not a ' ', ')', or an operator, must be muliplication
+                            string star = " * ";
+                            if (parens > 1)
+                            {
+                                //this ( is inside parens
+                                star = "*";
+                            }
+                            separatedEqn = separatedEqn.Insert(index + 1, star);
+                            inserted += star.Length;
+                        }
+                    }
                     parens--;
+                }
                 else if (parens > 0)
                 {
                     //inside of a pair of parentheses remove spaces
@@ -457,7 +528,6 @@ namespace MATT
                 else
                 {
                     //outside of parentheses add spaces around operators (except ^, !, ||)
-                    char[] basicOperators = { '+', '-', '*', '/' };
                     if (basicOperators.Contains(cur))
                     {
                         if (cur.Equals('-'))
@@ -988,7 +1058,7 @@ namespace MATT
                         string givenSepEqn;
                         bool multGivenDegrees = separateMultTerms(equationTB.Text, variable1, out givenSepEqn);
                         //ex: 3x+7 move constants to solve
-                        if (givenSepEqn.Length == separatedEqn.Length) // only these three terms given
+                        if (givenSepEqn.Length == separatedEqn.Length) // only these three terms given(in case of recursion?)
                         {
                             LinkLabel solve = addLinkLabel("Remove Constant Terms", "RemoveConstants", linkLabelCount++);
                             if (solve == null) linkLabelCount--;
@@ -1363,6 +1433,14 @@ namespace MATT
                     //check for sqrt in denominator
                     if (denom.Contains("sqrt"))
                     {
+                        string separatedDenom;
+                        bool multiDenom = separateMultTerms(denom, variable1, out separatedDenom);
+                        if (multiDenom)
+                        {
+                            LinkLabel cancel = addLinkLabel("Simplifying Quotients", "CancelDivision", linkLabelCount++);
+                            if (cancel == null) linkLabelCount--;
+                            loadInstructions(cancel);
+                        }
                         //multiply by conjugate
                         LinkLabel conjugate = addLinkLabel("Rationalize the Denominator", "Rationalize", linkLabelCount++);
                         if (conjugate == null) linkLabelCount--;
@@ -1572,6 +1650,11 @@ namespace MATT
                 {
                     string separatedTerm;
                     bool multiSubTerm = separateMultTerms(term, variable1, out separatedTerm);
+                    if (term.Contains("sqrt"))
+                    {
+                        string withOutSqrt = term.Remove(term.IndexOf("sqrt"), 4);
+                        multiSubTerm = separateMultTerms(withOutSqrt, variable1, out separatedTerm);
+                    }
                     if (!term.Contains(variable1))
                     {
                         if (!multiSubTerm)
@@ -1604,24 +1687,37 @@ namespace MATT
                         if (!multiSubTerm)
                         {
                             //get value of exponent in this single term
-                            int indexOfCarat = separatedTerm.IndexOf("^");
-                            string strExp = separatedTerm.Substring(indexOfCarat + 1, separatedTerm.Length - indexOfCarat - 1);
-
-                            string separatedExp;
-                            bool multTermExp = separateMultTerms(strExp, variable1, out separatedExp);
-
-                            //try to parse with the separatedExp b/c if it was (#) then separateMultTerms will remove parens
-                            double doubleExp;
-                            bool parsedExpSuccess = double.TryParse(separatedExp, out doubleExp);
-
-                            if (parsedExpSuccess)
-                                degrees.Add((int)doubleExp);
+                            int indexOfCarat = separatedTerm.IndexOf(variable1 + "^");
+                            if (indexOfCarat == -1)
+                                indexOfCarat = separatedTerm.IndexOf(")^");
+                            if (indexOfCarat == -1)
+                            {
+                                //carat was not on the variable
+                                if (separatedTerm.Contains(variable1))
+                                    degrees.Add(1);
+                                else
+                                    degrees.Add(0);
+                            }
                             else
                             {
-                                if (multTermExp && !strExp.Contains(variable1))
+                                string strExp = separatedTerm.Substring(indexOfCarat+2, separatedTerm.Length - indexOfCarat - 2);
+
+                                string separatedExp;
+                                bool multTermExp = separateMultTerms(strExp, variable1, out separatedExp);
+
+                                //try to parse with the separatedExp b/c if it was (#) then separateMultTerms will remove parens
+                                double doubleExp;
+                                bool parsedExpSuccess = double.TryParse(separatedExp, out doubleExp);
+
+                                if (parsedExpSuccess)
+                                    degrees.Add((int)doubleExp);
+                                else
                                 {
-                                    //multiple terms, but no variables.
-                                    degrees.Add((int)evalNoVars(separatedExp));
+                                    if (multTermExp && !strExp.Contains(variable1))
+                                    {
+                                        //multiple terms, but no variables.
+                                        degrees.Add((int)evalNoVars(separatedExp));
+                                    }
                                 }
                             }
                         }
@@ -1675,168 +1771,7 @@ namespace MATT
                             insertPictures();
                             break;
                         case equationType.twoVar:
-                            if (givenEqn.Contains("x"))
-                                variable1 = 'x';
-                            if (givenEqn.Contains('y'))
-                                variable2 = 'y';
-
-                            if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
-                            {
-                                LinkLabel radian = addLinkLabel("Converting Radians to Degrees", "RadToDeg", linkLabelCount++);
-                                if (radian == null) linkLabelCount--;
-                                loadInstructions(radian);
-                                insertPictures();
-                                break;
-                            }
-
-                            //if shorter side of equation isnt just y= or x= then subtract it from the rhs
-                            //ex: y^2 + 1 = x^2 + 8  -->  x^2 + 8 - (y^2+1)
-                            if (givenEqn.Contains('='))
-                            {
-                                string[] splitOnEquals = givenEqn.Split('=');
-                                if (splitOnEquals.Length > 2)
-                                {
-                                    instructionsRTB.Text = "Oh no! You entered more than one equals sign (=). Please re-enter your equation.\n\n-Matt";
-                                    break; // abort
-                                }
-                                string lhs = splitOnEquals[0].Trim();
-                                string rhs = splitOnEquals[1].Trim();
-
-                                //make rhs the longer term
-                                if (lhs.Length > rhs.Length)
-                                {
-                                    string temp = rhs;
-                                    rhs = lhs;
-                                    lhs = temp;
-                                }
-
-                                //if (lhs.Length > 1)
-                                {
-                                    //more than just y=, add -lhs onto the end of rhs
-                                    //need parens b/c need to distribute neg.
-                                    givenEqn = rhs + "- (" + lhs + ")";
-                                }
-                            }
-
-                            //info wrt variable 1
-                            string separatedEqnX;
-                            bool multDegX = separateMultTerms(givenEqn, variable1, out separatedEqnX);
-                            List<int> degreesX = listDegreesR(variable1, separatedEqnX);
-                            int highestDegreeX = degreesX.Max();
-
-                            //info wrtY (variable2)
-                            string separatedEqnY;
-                            bool multDegY = separateMultTerms(givenEqn, variable2, out separatedEqnY);
-                            List<int> degreesY = listDegreesR(variable2, separatedEqnY);
-                            int highestDegreeY = degreesY.Max();
-
-                            if (highestDegreeX == 1 && highestDegreeY == 1)
-                            {
-                                //linear equation
-                                //if (!(givenEqn.Contains("y=") || givenEqn.Contains("y =") || givenEqn.Contains("=y")))
-                                if(degreesY.Count > 2) //more than just the x term and the y term
-                                {
-                                    //solve for y, put it in y=mx+b form
-                                    instructionsRTB.Text += "Solve the equation for the second variable in order to put in slope-intercept form";
-                                    //move everything to the other side and get rid of coef
-                                    LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
-                                    if (solve == null) linkLabelCount--;
-                                    loadInstructions(solve);
-                                }
-
-                                LinkLabel mxb = addLinkLabel("Graphing an Equation in Slope-Intercept Form", "GraphYEq", linkLabelCount++);
-                                if (mxb == null) linkLabelCount--;
-                                loadInstructions(mxb);
-
-                                //other instructions for linear equations
-                                LinkLabel standard = addLinkLabel("Put Equation into Standard Form", "StandardForm", linkLabelCount++);
-                                if (standard == null) linkLabelCount--;
-
-                                LinkLabel graph = addLinkLabel("Graphing a Linear Equation", "GraphLinear", linkLabelCount++);
-                                if (graph == null) linkLabelCount--;
-                            }
-                            else if (highestDegreeX == 2 && highestDegreeY == 2)
-                            {
-                                //circle or ellipse or hyperbola
-
-                                //if has ^2 term and ^1 term then prob. need to factor to put in form of equation
-                                if (degreesX.Contains(1) || degreesY.Contains(1))
-                                {
-                                    LinkLabel factor = addLinkLabel("Factor to Find Center", "Factoring", linkLabelCount++);
-                                    if (factor == null) linkLabelCount--;
-                                    loadInstructions(factor);
-                                }
-
-                                if (separatedEqnX.Contains(" / ") || separatedEqnX.Contains("^2/") || separatedEqnX.Contains("^2)/"))
-                                {//need to make sure division is right (not a fraction)
-
-                                    // + ellipse
-                                    if (separatedEqnX.Contains(" + ")) // equation has a spaced +
-                                    {
-                                        LinkLabel ellipse = addLinkLabel("The Equation of an Ellipse", "EllipseEqn", linkLabelCount++);
-                                        if (ellipse == null) linkLabelCount--;
-                                        loadInstructions(ellipse);
-                                    }
-                                    else
-                                    {
-                                        //- hyperbola
-                                        LinkLabel hyp = addLinkLabel("The Equation of a Hyperbola", "Hyperbola", linkLabelCount++);
-                                        if (hyp == null) linkLabelCount--;
-                                        loadInstructions(hyp);
-                                    }
-                                }
-                                else
-                                {
-                                    //circle
-                                    LinkLabel cir = addLinkLabel("The Equation of a Circle", "CircleEqn", linkLabelCount++);
-                                    if (cir == null) linkLabelCount--;
-                                    loadInstructions(cir);
-                                }
-                            }
-                            else
-                            {
-                                //the degrees mismatch. not 1,1 or 2,2
-                                //Vertical Parabola
-                                if (highestDegreeX == 2 && highestDegreeY == 1)
-                                {
-                                    //y=x^2 , y = 3x^2+5x-7
-                                    if (degreesX.Contains(1))
-                                    {
-                                        LinkLabel factor = addLinkLabel("Factor to Find Vertex", "Factoring", linkLabelCount++);
-                                        if (factor == null) linkLabelCount--;
-                                        loadInstructions(factor);
-                                    }
-                                    LinkLabel par = addLinkLabel("Graphing a Parabola", "VParabola", linkLabelCount++);
-                                    if (par == null) linkLabelCount--;
-                                    loadInstructions(par);
-                                    
-                                }
-                                else
-                                {
-                                    //parabolas opening left or right
-                                    if (highestDegreeY == 2 && highestDegreeX == 1)//x=y^2
-                                    {
-                                        LinkLabel par = addLinkLabel("Graphing a Parabola", "HParabola", linkLabelCount++);
-                                        if (par == null) linkLabelCount--;
-                                        loadInstructions(par);
-                                    }
-                                    else
-                                    {
-                                        instructionsRTB.Text = "Pick a topic from below to view.";
-
-                                        LinkLabel intercepts = addLinkLabel("Finding X and Y Intercepts", "Intercepts", linkLabelCount++);
-                                        if (intercepts == null) linkLabelCount--;
-
-                                        //move everything to the other side and get rid of coef
-                                        LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
-                                        if (solve == null) linkLabelCount--;
-
-                                        LinkLabel graph = addLinkLabel("Graphing a Non-Linear Equation", "GraphNonLinear", linkLabelCount++);
-                                        if (graph == null) linkLabelCount--;
-                                    }
-                                }
-                            }
-
+                            caseTwoVariables(ref givenEqn, ref linkLabelCount, ref variable1, ref variable2);
                             insertPictures();
                             break;
                         case equationType.multEqn:
@@ -1867,37 +1802,122 @@ namespace MATT
                             insertPictures();
                             break;
                         case equationType.trigVar:
-                            
-                            string separated;
-                            bool multTerms = separateMultTerms(givenEqn, variable1, out separated);
-                            //sin(x) = 1/2 -> UC/Triangle
-                            LinkLabel unit = addLinkLabel("Using the Unit Circle", "UnitCircle", linkLabelCount++);
-                            if (unit == null) linkLabelCount--;
 
-                            if (!multTerms)
+                            linkLabelCount = caseTrigWithVariables(givenEqn, linkLabelCount, variable1, variable2);
+
+                            insertPictures();
+                            break;
+                        case equationType.log:
+
+                            string separatedEqn;
+                            bool multipleTerms = separateMultTerms(givenEqn, variable1, out separatedEqn);
+
+                            if (multipleTerms)
                             {
-                                LinkLabel triangle = addLinkLabel("Evaluating Trigonometric Functions", "TriangleTrig", linkLabelCount++);
-                                if (triangle == null) linkLabelCount--;
+                                string separatedEqnWithSpaces = " " + separatedEqn + " ";
+                                string[] splitPlusMinus = separatedEqnWithSpaces.Split(new char[] { '+', '-' });
+                                for (int i = 0; i < splitPlusMinus.Length; i++)
+                                {
+                                    string curTerm = splitPlusMinus[i];
+                                    //if curTerm starts and ends with space then the +/- isn't in parens
+                                    if (curTerm.ElementAt(0).Equals(' ') && curTerm.ElementAt(curTerm.Length - 1).Equals(' '))
+                                    {
+                                        bool twoLogs = false;
+                                        if (i < splitPlusMinus.Length - 1)
+                                        {
+                                            string after = splitPlusMinus[i + 1];
+                                            if (curTerm.IndexOf("log") >= 0 && after.IndexOf("log") >= 0)
+                                            {
+                                                twoLogs = true;
+                                            }
+                                            else if (curTerm.IndexOf("ln") >= 0 && after.IndexOf("ln") >= 0)
+                                            {
+                                                twoLogs = true;
+                                            }
+                                        }
+                                        if (twoLogs)
+                                        {
+                                            //need to find if operator is + or -
+                                            int numOp = i;
+                                            int j = -1;
+                                            while (numOp >= 0)
+                                            {
+                                                j++;
+                                                if (separatedEqn.ElementAt(j).Equals('+') || separatedEqn.ElementAt(j).Equals('-'))
+                                                {
+                                                    numOp--;
+                                                }
+                                            }
+                                            string op = separatedEqn.ElementAt(j).ToString();
+                                            if (op.Equals("+"))
+                                            {
+                                                LinkLabel product = addLinkLabel("Logarithm of a Product", "LogMultiplication", linkLabelCount++);
+                                                if (product == null) linkLabelCount--;
+                                                loadInstructions(product);
+                                            }
+                                            else if (op.Equals("-"))
+                                            {
+                                                LinkLabel div = addLinkLabel("Logarithm of a Quotient", "LogDivision", linkLabelCount++);
+                                                if (div == null) linkLabelCount--;
+                                                loadInstructions(div);
+                                            }
+                                        }
+                                    }//end check for space
+                                }// end for splitPlusMinus
+                                
+                                //check for coef with log
+                                //send each log term to singleLog
+                                string[] splitEqn = separatedEqn.Split(' ');
+                                for (int i = 0; i < splitEqn.Length; i++)
+                                {
+                                    string cur = splitEqn[i];
+                                    if (cur.Trim().Equals("*"))
+                                    {
+                                        if (i != 0 && i < splitEqn.Length - 1)
+                                        {
+                                            string before = splitEqn[i - 1];
+                                            string after = splitEqn[i + 1];
+                                            if (before.IndexOf("log", StringComparison.OrdinalIgnoreCase) >= 0
+                                                ^ after.IndexOf("log", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                LinkLabel exp = addLinkLabel("Logarithm of an Exponent", "LogExponent", linkLabelCount++);
+                                                if (exp == null) linkLabelCount--;
+                                                loadInstructions(exp);
+                                            }
+                                            else if (before.IndexOf("ln", StringComparison.OrdinalIgnoreCase) >= 0
+                                              ^ after.IndexOf("ln", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                LinkLabel ln = addLinkLabel("Natural Logarithms", "LnBasics", linkLabelCount++);
+                                                if (ln == null) linkLabelCount--;
+                                                loadInstructions(ln);
 
-                                //if contains pi
-                                if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
-                                {
-                                    loadInstructions(unit);
-                                }
-                                else
-                                {
-                                    loadInstructions(triangle);
-                                }
-                            }
+                                                LinkLabel exp = addLinkLabel("Logarithm of an Exponent", "LogExponent", linkLabelCount++);
+                                                if (exp == null) linkLabelCount--;
+                                                loadInstructions(exp);
+                                            }
+                                        }
+                                    }
+                                    else if (cur.IndexOf("log", StringComparison.OrdinalIgnoreCase) >= 0
+                                       || cur.IndexOf("ln", StringComparison.OrdinalIgnoreCase) >= 0)
+                                    {
+                                        linkLabelCount = logOfSingleTerm(givenEqn, linkLabelCount, variable1);
+                                    }
+                                } // end for splitEqn
+                            }// end if mult terms
                             else
                             {
-                                //has multple terms
-                                //sin(x)^2 + cos(x)^2 -> properties
-                                //sin(x)^2 + cos(30)^2 = 1/2 -> ?
-                                LinkLabel props = addLinkLabel("Trigonometric Properties and Identities", "TrigProps", linkLabelCount++);
-                                if (props == null) linkLabelCount--;
-                                loadInstructions(props);
+                                linkLabelCount = logOfSingleTerm(givenEqn, linkLabelCount, variable1);
                             }
+
+                            LinkLabel log = addLinkLabel("Evaluating Logarithms", "LogBasics", linkLabelCount++);
+                            if (log == null) linkLabelCount--;
+                            loadInstructions(log);
+
+                            LinkLabel changeBase = addLinkLabel("Changing the Base of a Logarithm", "LogChangeBase", linkLabelCount++);
+                            if (changeBase == null) linkLabelCount--;
+
+                            LinkLabel laws = addLinkLabel("Properties of Logarithms", "LogLaws", linkLabelCount++);
+                            if (laws == null) linkLabelCount--;
 
                             insertPictures();
                             break;
@@ -1912,6 +1932,718 @@ namespace MATT
             catch (Exception ex)
             {
                 instructionsRTB.Text = "There was an error:\n\n" + ex.Message;
+            }
+        }
+
+        private int logOfSingleTerm(string givenEqn, int linkLabelCount, char variable1)
+        {
+            string separatedEqn;
+            bool multipleTerms = separateMultTerms(givenEqn, variable1, out separatedEqn);
+            int logIndex = -1;
+            string logarithm = "";
+            if (givenEqn.IndexOf("log", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                //contains log
+                logIndex = givenEqn.IndexOf("log", StringComparison.OrdinalIgnoreCase);
+                logarithm = givenEqn.Substring(logIndex, 3);
+            }
+            else
+            {
+                //contains ln
+                logIndex = givenEqn.IndexOf("ln", StringComparison.OrdinalIgnoreCase);
+                logarithm = givenEqn.Substring(logIndex, 2);
+
+                LinkLabel ln = addLinkLabel("Natural Logarithms", "LnBasics", linkLabelCount++);
+                if (ln == null) linkLabelCount--;
+                loadInstructions(ln);
+            }
+
+            //single log term
+            if (separatedEqn.Contains('/'))
+            {
+                LinkLabel div = addLinkLabel("Logarithm of a Quotient", "LogDivision", linkLabelCount++);
+                if (div == null) linkLabelCount--;
+                loadInstructions(div);
+            }
+            else if (separatedEqn.Contains('^'))
+            {
+                //check if ^ is inside log or outside ie log(x^2) vs log(x)^2
+                string value = separatedEqn.Substring(logIndex);
+                int closingParenIndex = separatedEqn.LastIndexOf(")"); // should be the close of the log since is only one term
+                value = value.Remove(closingParenIndex);
+                if (value.Contains("^"))
+                {
+                    LinkLabel exp = addLinkLabel("Logarithm of an Exponent", "LogExponent", linkLabelCount++);
+                    if (exp == null) linkLabelCount--;
+                    loadInstructions(exp);
+                }
+            }
+            else if (separatedEqn.Contains("*"))
+            {
+                LinkLabel product = addLinkLabel("Logarithm of a Product", "LogMultiplication", linkLabelCount++);
+                if (product == null) linkLabelCount--;
+                loadInstructions(product);
+            }
+            else if(!variable1.Equals(' ') && separatedEqn.Contains(variable1))
+            {
+                //also need to check for 2x
+                int varIndex = separatedEqn.IndexOf(variable1);
+                if (varIndex != 0)
+                {
+                    string possibleCoef = separatedEqn.ElementAt(varIndex - 1).ToString();
+                    double coef;
+                    if (double.TryParse(possibleCoef, out coef))
+                    {
+                        LinkLabel product = addLinkLabel("Logarithm of a Product", "LogMultiplication", linkLabelCount++);
+                        if (product == null) linkLabelCount--;
+                        loadInstructions(product);
+                    }
+                }
+            }
+            return linkLabelCount;
+        }
+
+        private int caseTrigWithVariables(string givenEqn, int linkLabelCount, char variable1, char variable2)
+        {
+            string separated;
+            bool multTerms = separateMultTerms(givenEqn, variable1, out separated);
+            //sin(x) = 1/2 -> UC/Triangle
+            LinkLabel unit = addLinkLabel("Using the Unit Circle", "UnitCircle", linkLabelCount++);
+            if (unit == null) linkLabelCount--; 
+
+            string[] trigFuncs = { "sin", "cos", "tan", "csc", "sec", "cot" };
+            if (!multTerms)
+            {
+                if (!variable2.Equals(' ') && separated.Contains(variable1) && separated.Contains(variable2))
+                {
+                    //has two variables
+                    //sin(x+-y) -> sin(x)cos(y) +- cos(x)sin(y) sum and diff
+                    //sum and diff is the only one that could be two vars and one term
+                    LinkLabel sad = addLinkLabel("Sum and Difference Formulas", "TrigSumDiff", linkLabelCount++);
+                    if (sad == null) linkLabelCount--;
+                    loadInstructions(sad);
+                }
+                else
+                {
+                    //only has one variable one term
+                    //half angle formulas
+                    //sin(2x) -> 2sin(x)cos(x) double angle
+                    if (separated.Contains("(2" + variable1))
+                    {
+                        LinkLabel da = addLinkLabel("Double Angle Formulas", "TrigDoubleAngle", linkLabelCount++);
+                        if (da == null) linkLabelCount--;
+                        loadInstructions(da);
+                    }
+                    else if (separated.Contains(variable1 + "/2)"))
+                    {
+                        LinkLabel ha = addLinkLabel("Half Angle Formulas", "TrigHalfAngle", linkLabelCount++);
+                        if (ha == null) linkLabelCount--;
+                        loadInstructions(ha);
+                    }
+                    else
+                    {
+                        if (separated.Contains("sec") || separated.Contains("csc") || separated.Contains("cot"))
+                        {
+                            LinkLabel ids = addLinkLabel("Trig. Function Identities", "TrigReciprocalIDs", linkLabelCount++);
+                            if (ids == null) linkLabelCount--;
+                            loadInstructions(ids);
+                        }
+                        LinkLabel triangle = addLinkLabel("Evaluating Trigonometric Functions", "TriangleTrig", linkLabelCount++);
+                        if (triangle == null) linkLabelCount--;
+
+                        //if contains pi
+                        if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
+                        {
+                            loadInstructions(unit);
+                        }
+                        else
+                        {
+                            loadInstructions(triangle);
+                        }
+                    }
+
+                    if (separated.Contains(")^2"))
+                    {
+                        //one term, one var, squared 
+                        //half angle
+                        LinkLabel ha = addLinkLabel("Half Angle Formulas", "TrigHalfAngle", linkLabelCount++);
+                        if (ha == null) linkLabelCount--;
+                        loadInstructions(ha);
+                    }//end contains ^2
+
+                    foreach (string function in trigFuncs)
+                    {
+                        //check for even/odd function rules
+                        if (separated.Contains(function + "(-"))
+                        {
+                            LinkLabel eo = addLinkLabel("Even and Odd Formulas", "TrigEvenOdd", linkLabelCount++);
+                            if (eo == null) linkLabelCount--;
+                            loadInstructions(eo);
+                        }
+                    }
+                }// end has one var
+            }
+            else
+            {
+                //has multple terms
+                //sin(x)^2 + cos(x)^2 = 1 -> properties
+                //sin(x)^2 + cos(30)^2 = 78 -> ?
+                bool showAllProps = true;
+
+                string[] splitEqn = separated.Split(' ');
+                //sin / cos -> tan
+                if (separated.Contains(" / "))
+                {
+                    if (splitEqn.Length == 3)
+                    {
+                        //check for trig in denom or else just has fraction coef
+                        string denom = getDenominator(splitEqn);
+                        double d;
+                        if (double.TryParse(denom, out d))
+                        {
+                            if (givenEqn.Contains("="))
+                            {
+                                LinkLabel removeD = addLinkLabel("Remove Constants from the Denominator", "RemoveDenomConst", linkLabelCount++);
+                                if (removeD == null) linkLabelCount--;
+                                loadInstructions(removeD);
+                            }
+                            else
+                            {
+                                LinkLabel frac = addLinkLabel("Maniputlating Coefficients", "MultDivNumVar", linkLabelCount++);
+                                if (frac == null) linkLabelCount--;
+                                loadInstructions(frac);
+                            }
+                        }
+                        else
+                        {
+                            //need to separate 1/2(cos(x-y)-cos(x+y)) from 1/cos(xy)
+                            string[] trigSplit = separated.Split('(');
+                            int trigCount = 0;
+                            foreach (string section in trigSplit)
+                            {
+                                foreach (string func in trigFuncs)
+                                {
+                                    if (section.Contains(func))
+                                        trigCount++;
+                                }
+                            }
+                            if (trigCount == 1)
+                            {
+                                LinkLabel ids = addLinkLabel("Trig. Function Identities", "TrigReciprocalIDs", linkLabelCount++);
+                                if (ids == null) linkLabelCount--;
+                                loadInstructions(ids);
+                                showAllProps = false;
+                            }
+                            else
+                            { //sin(x)sin(y) -> 1/2(cos(x-y)-cos(x+y)) product to sum
+                                if (separated.Contains(variable1 + "-" + variable2) || separated.Contains("-" + variable2 + "+" + variable1))
+                                { //x-y || -y+x
+                                    LinkLabel pts = addLinkLabel("Product to Sum Formulas", "TrigProductSum", linkLabelCount++);
+                                    if (pts == null) linkLabelCount--;
+                                    loadInstructions(pts);
+                                    showAllProps = false;
+                                }
+                                else if (separated.Contains("1-cos(2") || separated.Contains("1+cos(2"))
+                                {
+                                    //half angle -> 1/2(1-cos(2x)) || 1/2(1+cos(2x))
+                                    LinkLabel ha = addLinkLabel("Half Angle Formulas", "TrigHalfAngle", linkLabelCount++);
+                                    if (ha == null) linkLabelCount--;
+                                    loadInstructions(ha);
+                                    showAllProps = false;
+                                }
+                            }
+                        }
+                    }//end if length == 3
+                    else
+                    {
+                        if (separated.Contains("tan")) //tan but no others...
+                        {
+                            //sum and diff or double angle
+                            if (separated.Contains("2tan(") && (separated.Contains("- tan(") || separated.Contains("-tan(")))
+                            {
+                                //double angle
+                                LinkLabel da = addLinkLabel("Double Angle Formulas", "TrigDoubleAngle", linkLabelCount++);
+                                if (da == null) linkLabelCount--;
+                                loadInstructions(da);
+                                showAllProps = false;
+                            }
+                            else
+                            {
+                                //sum and diff (by default)
+                                LinkLabel sad = addLinkLabel("Sum and Difference Formulas", "TrigSumDiff", linkLabelCount++);
+                                if (sad == null) linkLabelCount--;
+                                loadInstructions(sad);
+                                showAllProps = false;
+                            }
+                        }
+                        else if ((separated.Contains("- cos(") && separated.Contains("+ cos("))
+                            || (separated.Contains("-cos(") && separated.Contains("+cos(")))
+                        {
+                            //half angle
+                            LinkLabel ha = addLinkLabel("Half Angle Formulas", "TrigHalfAngle", linkLabelCount++);
+                            if (ha == null) linkLabelCount--;
+                            loadInstructions(ha);
+                            showAllProps = false;
+                        }
+                    }
+                } // end if has /  
+
+                if (separated.Contains(" * "))
+                {
+                    //sin(x) + sin(y) -> 2sin((x+y)/2)cos((x-y)/2) sum to prod
+                    //2sin(x)cos(x) -> sin(2x) double angle
+                    int starCount = separated.Split('*').Length - 1;
+                    bool doubleAngleOrSumProd = false;
+                    if (starCount == 1 && (separated.Contains("2s") || separated.Contains("2c")))
+                    {
+                        //separated into 2sin(x) * cos(x)
+                        doubleAngleOrSumProd = true;
+                    }
+                    else if (starCount == 2 && separated.Contains("* 2"))
+                    {
+                        //sin(x) * cos(x) * 2
+                        doubleAngleOrSumProd = true;
+                    }
+
+                    if (doubleAngleOrSumProd)
+                    {
+                        //2sin(x)cos(x)
+                        if (variable2.Equals(' '))
+                        {
+                            //one variable -> double angle
+                            LinkLabel da = addLinkLabel("Double Angle Formulas", "TrigDoubleAngle", linkLabelCount++);
+                            if (da == null) linkLabelCount--;
+                            loadInstructions(da);
+                            showAllProps = false;
+                        }
+                        else
+                        { //2sin((x+y)/2)cos((x-y)/2) stp
+                            //two variables -> sum to product
+                            if (separated.Contains(variable1 + "-" + variable2) || separated.Contains("-" + variable2 + "+" + variable1))
+                            { //x-y || -y+x
+                                LinkLabel stp = addLinkLabel("Sum to Product Formulas", "TrigSumProduct", linkLabelCount++);
+                                if (stp == null) linkLabelCount--;
+                                loadInstructions(stp);
+                                showAllProps = false;
+                            }
+                        }
+                    }
+
+                    //sin(x)sin(y) -> 1/2(cos(x-y)-cos(x+y)) product to sum
+                    if (splitEqn.Length == 3)
+                    {
+                        //sin*sin, cos*cos, sin*cos, or cos*sin
+                        if (splitEqn[0].Contains("sin") || splitEqn[0].Contains("cos"))
+                        {
+                            // &&
+                            if (splitEqn[2].Contains("sin") || splitEqn[2].Contains("cos"))
+                            {
+                                //need to nave different variables
+                                if (!variable2.Equals(' '))
+                                {
+                                    LinkLabel pts = addLinkLabel("Product to Sum Formulas", "TrigProductSum", linkLabelCount++);
+                                    if (pts == null) linkLabelCount--;
+                                    loadInstructions(pts);
+                                    showAllProps = false;
+                                }
+                                else
+                                {
+                                    //variable is the same
+                                    if ((splitEqn[0].Contains("sin") && splitEqn[2].Contains("sin")) || (splitEqn[0].Contains("cos") && splitEqn[2].Contains("cos")))
+                                    {
+                                        //variable is the same and function is the same (sin(x) * sin(x))
+                                        LinkLabel m = addLinkLabel("Multiplying Terms", "MultDivVariables", linkLabelCount++);
+                                        if (m == null) linkLabelCount--;
+                                        loadInstructions(m);
+                                        showAllProps = false;
+                                    }
+                                }
+                            }
+                        }
+                    }// end if split length == 3
+
+                    //sin(x)cos(y) +- cos(x)sin(y) <- sin(x+-y) sum and diff
+                    string[] splitOp = null;
+                    bool starAndPlusMinus = false;
+                    if (separated.Contains(" + "))
+                    {
+                        //mult terms and has * and +
+                        splitOp = separated.Split('+');
+                        starAndPlusMinus = true;
+                    }
+                    else if (separated.Contains(" - "))
+                    {
+                        //mult terms and has * and -
+                        splitOp = separated.Split('-');
+                        starAndPlusMinus = true;
+                    }
+
+                    if (starAndPlusMinus)
+                    {
+                        int sinCosCount = 0;
+                        int sinSinCount = 0;
+                        int cosCosCount = 0;
+                        foreach (string term in splitOp)
+                        {
+                            if (term.Contains("sin") && term.Contains("cos"))
+                                sinCosCount++;
+                            else if (term.Contains("sin"))
+                            {
+                                //need to make sure term has two of the same
+                                string[] splitMult = term.Split('*');
+                                if (splitMult.Length == 2)
+                                {
+                                    if (splitMult[0].Contains("sin") && splitMult[1].Contains("sin"))
+                                        sinSinCount++;
+                                }
+                            }
+                            else if (term.Contains("cos"))
+                            {
+                                //need to make sure term has two of the same
+                                string[] splitMult = term.Split('*');
+                                if (splitMult.Length == 2)
+                                {
+                                    if (splitMult[0].Contains("cos") && splitMult[1].Contains("cos"))
+                                        cosCosCount++;
+                                }
+                            }
+                        }//end foreach
+
+                        if (sinCosCount == 2 || (sinSinCount == 1 && cosCosCount == 1))
+                        {
+                            //sum and difference for sin and cos confirmed
+                            LinkLabel sad = addLinkLabel("Sum and Difference Formulas", "TrigSumDiff", linkLabelCount++);
+                            if (sad == null) linkLabelCount--;
+                            loadInstructions(sad);
+                            showAllProps = false;
+                        }
+                    }// end starAndPlusMinus
+                }// end contains *
+
+                if (separated.Contains(")^2"))
+                {
+                    //pythagorean or double angle
+                    //sin(x)^2 +/- cos(x)^2 
+                    //1-cos(x)^2
+                    //2cos(x)^2 -1
+                    List<string> squaredFunctions = new List<string>();
+                    foreach (string function in trigFuncs)
+                    {
+                        if (separated.Contains(function))
+                        {
+                            string separatedCopy = separated;
+                            int indexOfFunc = separatedCopy.LastIndexOf(function);
+                            while (indexOfFunc != -1)
+                            {
+                                int startParenIndex = indexOfFunc + 3; //add three to get to the paren sin(x+1)^2
+                                string findParens = separatedCopy.Substring(startParenIndex);
+
+                                var stack = new Stack<int>();
+                                int closeParenIndex = -1;
+                                for (int i = 0; i < findParens.Length; i++)
+                                {
+                                    if (closeParenIndex == -1) //want to stop once the match is found for the trig func
+                                    {
+                                        switch (findParens[i])
+                                        {
+                                            case '(':
+                                                stack.Push(i);
+                                                break;
+                                            case ')':
+                                                if (stack.Count > 0)
+                                                    stack.Pop();
+                                                if (stack.Count == 0)
+                                                    closeParenIndex = i + startParenIndex; //need to offset because of the removed function
+                                                break;
+                                            default:
+                                                break;
+                                        }
+                                    }
+                                    else
+                                        break;
+                                }
+
+                                //check for square after paren
+                                string afterParen = "";
+                                if (closeParenIndex <= separatedCopy.Length - 2) //close parens has at least two chars before end of string
+                                {
+                                    afterParen = separatedCopy.Substring(closeParenIndex + 1, 2);
+                                }
+                                if (afterParen.Equals("^2"))
+                                {
+                                    squaredFunctions.Add(function);
+                                }
+                                //want from begining of func to ^2 to be removed
+                                string beforeFunction = separatedCopy.Substring(0, indexOfFunc);
+                                string afterFunction = separatedCopy.Substring(closeParenIndex + afterParen.Length + 1);
+                                separatedCopy = beforeFunction + afterFunction;
+                                indexOfFunc = separatedCopy.LastIndexOf(function);
+                            }//end while
+                        }
+                    }//end foreach function
+
+                    //I recognize that this checking is weak...
+                    if (squaredFunctions.Contains("sin") && squaredFunctions.Contains("cos"))
+                    {
+                        //pythagorean: sin^2 + cos^2
+                        //double angle: cos^2 - sin^2
+                        if (separated.Contains("-sin") || separated.Contains("- sin"))
+                        {
+                            LinkLabel da = addLinkLabel("Double Angle Formulas", "TrigDoubleAngle", linkLabelCount++);
+                            if (da == null) linkLabelCount--;
+                            loadInstructions(da);
+                            showAllProps = false;
+                        }
+                        else
+                        {
+                            LinkLabel py = addLinkLabel("Pythagorean Identities", "TrigPy", linkLabelCount++);
+                            if (py == null) linkLabelCount--;
+                            loadInstructions(py);
+                            showAllProps = false;
+                        }
+                    }
+                    else if (squaredFunctions.Contains("tan"))
+                    {
+                        //pythagorean: tan^2 + 1
+                        if (separated.Contains("1") && separated.Contains("+"))
+                        {
+                            LinkLabel py = addLinkLabel("Pythagorean Identities", "TrigPy", linkLabelCount++);
+                            if (py == null) linkLabelCount--;
+                            loadInstructions(py);
+                            showAllProps = false;
+                        }
+                        //double angle:  2tan / 1 - tan^2
+                        if (separated.Contains(" / ") && (separated.Contains("- tan") || separated.Contains("-tan")))
+                        {
+                            LinkLabel da = addLinkLabel("Double Angle Formulas", "TrigDoubleAngle", linkLabelCount++);
+                            if (da == null) linkLabelCount--;
+                            loadInstructions(da);
+                            showAllProps = false;
+                        }
+                    }
+                    else if (squaredFunctions.Contains("cot"))
+                    {
+                        //pythagorean: 1 + cot^2
+                        if (separated.Contains("1") && separated.Contains("+"))
+                        {
+                            LinkLabel py = addLinkLabel("Pythagorean Identities", "TrigPy", linkLabelCount++);
+                            if (py == null) linkLabelCount--;
+                            loadInstructions(py);
+                            showAllProps = false;
+                        }
+                    }
+                }//end contais ^2
+
+                if (separated.Contains(" + ") || separated.Contains(" - "))
+                {
+                    string term = "";
+                    for (int i = 0; i < splitEqn.Length; i++)
+                    {
+                        term = splitEqn[i];
+                        if (term.Equals("+") || term.Equals("-"))
+                        {
+                            if (i > 0 && i < splitEqn.Length - 1)
+                            {
+                                string before = splitEqn[i - 1];
+                                string after = splitEqn[i + 1];
+                                if (!before.Equals(after))
+                                {
+                                    if ((before.Contains("sin") && after.Contains("sin")) ^ (before.Contains("cos") && after.Contains("cos")))
+                                    {
+                                        //terms are not equal but both contain sin XOR both contain cos
+                                        //sin(a) +- sin(b) || cos(a) +- cos(b) sum to product
+                                        LinkLabel stp = addLinkLabel("Sum to Product Formulas", "TrigSumProduct", linkLabelCount++);
+                                        if (stp == null) linkLabelCount--;
+                                        loadInstructions(stp);
+                                        showAllProps = false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }//end contains +/-
+
+                if (splitEqn.Length > 2)
+                {
+                    foreach (string term in splitEqn)
+                    {
+                        linkLabelCount = caseTrigWithVariables(term, linkLabelCount, variable1, variable2);
+                    }
+                }
+
+                LinkLabel props = addLinkLabel("Trigonometric Properties and Identities", "TrigProps", linkLabelCount++);
+                if (props == null) linkLabelCount--;
+
+                if (showAllProps)
+                {
+                    loadInstructions(props);
+                }
+            }//end multiple terms
+            return linkLabelCount;
+        }
+
+        private void caseTwoVariables(ref string givenEqn, ref int linkLabelCount, ref char variable1, ref char variable2)
+        {
+            if (givenEqn.Contains("x"))
+                variable1 = 'x';
+            if (givenEqn.Contains('y'))
+                variable2 = 'y';
+
+            if (givenEqn.IndexOf("pi", StringComparison.InvariantCultureIgnoreCase) >= 0)
+            {
+                LinkLabel radian = addLinkLabel("Converting Radians to Degrees", "RadToDeg", linkLabelCount++);
+                if (radian == null) linkLabelCount--;
+                loadInstructions(radian);
+                insertPictures();
+                return;
+            }
+
+            //if shorter side of equation isnt just y= or x= then subtract it from the rhs
+            //ex: y^2 + 1 = x^2 + 8  -->  x^2 + 8 - (y^2+1)
+            if (givenEqn.Contains('='))
+            {
+                string[] splitOnEquals = givenEqn.Split('=');
+                if (splitOnEquals.Length > 2)
+                {
+                    instructionsRTB.Text = "Oh no! You entered more than one equals sign (=). Please re-enter your equation.\n\n-Matt";
+                    return; // abort
+                }
+                string lhs = splitOnEquals[0].Trim();
+                string rhs = splitOnEquals[1].Trim();
+
+                //make rhs the longer term
+                if (lhs.Length > rhs.Length)
+                {
+                    string temp = rhs;
+                    rhs = lhs;
+                    lhs = temp;
+                }
+
+                //if (lhs.Length > 1)
+                {
+                    //more than just y=, add -lhs onto the end of rhs
+                    //need parens b/c need to distribute neg.
+                    givenEqn = rhs + "- (" + lhs + ")";
+                }
+            }
+
+            //info wrt variable 1
+            string separatedEqnX;
+            bool multDegX = separateMultTerms(givenEqn, variable1, out separatedEqnX);
+            List<int> degreesX = listDegreesR(variable1, separatedEqnX);
+            int highestDegreeX = degreesX.Max();
+
+            //info wrtY (variable2)
+            string separatedEqnY;
+            bool multDegY = separateMultTerms(givenEqn, variable2, out separatedEqnY);
+            List<int> degreesY = listDegreesR(variable2, separatedEqnY);
+            int highestDegreeY = degreesY.Max();
+
+            if (highestDegreeX == 1 && highestDegreeY == 1)
+            {
+                //linear equation
+                //if (!(givenEqn.Contains("y=") || givenEqn.Contains("y =") || givenEqn.Contains("=y")))
+                if (degreesY.Count > 2) //more than just the x term and the y term
+                {
+                    //solve for y, put it in y=mx+b form
+                    instructionsRTB.Text += "Solve the equation for the second variable in order to put in slope-intercept form";
+                    //move everything to the other side and get rid of coef
+                    LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
+                    if (solve == null) linkLabelCount--;
+                    loadInstructions(solve);
+                }
+
+                LinkLabel mxb = addLinkLabel("Graphing an Equation in Slope-Intercept Form", "GraphYEq", linkLabelCount++);
+                if (mxb == null) linkLabelCount--;
+                loadInstructions(mxb);
+
+                //other instructions for linear equations
+                LinkLabel standard = addLinkLabel("Put Equation into Standard Form", "StandardForm", linkLabelCount++);
+                if (standard == null) linkLabelCount--;
+
+                LinkLabel graph = addLinkLabel("Graphing a Linear Equation", "GraphLinear", linkLabelCount++);
+                if (graph == null) linkLabelCount--;
+            }
+            else if (highestDegreeX == 2 && highestDegreeY == 2)
+            {
+                //circle or ellipse or hyperbola
+
+                //if has ^2 term and ^1 term then prob. need to factor to put in form of equation
+                if (degreesX.Contains(1) || degreesY.Contains(1))
+                {
+                    LinkLabel factor = addLinkLabel("Factor to Find Center", "Factoring", linkLabelCount++);
+                    if (factor == null) linkLabelCount--;
+                    loadInstructions(factor);
+                }
+
+                if (separatedEqnX.Contains(" / ") || separatedEqnX.Contains("^2/") || separatedEqnX.Contains("^2)/"))
+                {//need to make sure division is right (not a fraction)
+
+                    // + ellipse
+                    if (separatedEqnX.Contains(" + ")) // equation has a spaced +
+                    {
+                        LinkLabel ellipse = addLinkLabel("The Equation of an Ellipse", "EllipseEqn", linkLabelCount++);
+                        if (ellipse == null) linkLabelCount--;
+                        loadInstructions(ellipse);
+                    }
+                    else
+                    {
+                        //- hyperbola
+                        LinkLabel hyp = addLinkLabel("The Equation of a Hyperbola", "Hyperbola", linkLabelCount++);
+                        if (hyp == null) linkLabelCount--;
+                        loadInstructions(hyp);
+                    }
+                }
+                else
+                {
+                    //circle
+                    LinkLabel cir = addLinkLabel("The Equation of a Circle", "CircleEqn", linkLabelCount++);
+                    if (cir == null) linkLabelCount--;
+                    loadInstructions(cir);
+                }
+            }
+            else
+            {
+                //the degrees mismatch. not 1,1 or 2,2
+                //Vertical Parabola
+                if (highestDegreeX == 2 && highestDegreeY == 1)
+                {
+                    //y=x^2 , y = 3x^2+5x-7
+                    if (degreesX.Contains(1))
+                    {
+                        LinkLabel factor = addLinkLabel("Factor to Find Vertex", "Factoring", linkLabelCount++);
+                        if (factor == null) linkLabelCount--;
+                        loadInstructions(factor);
+                    }
+                    LinkLabel par = addLinkLabel("Graphing a Parabola", "VParabola", linkLabelCount++);
+                    if (par == null) linkLabelCount--;
+                    loadInstructions(par);
+
+                }
+                else
+                {
+                    //parabolas opening left or right
+                    if (highestDegreeY == 2 && highestDegreeX == 1)//x=y^2
+                    {
+                        LinkLabel par = addLinkLabel("Graphing a Parabola", "HParabola", linkLabelCount++);
+                        if (par == null) linkLabelCount--;
+                        loadInstructions(par);
+                    }
+                    else
+                    {
+                        instructionsRTB.Text = "Pick a topic from below to view.";
+
+                        LinkLabel intercepts = addLinkLabel("Finding X and Y Intercepts", "Intercepts", linkLabelCount++);
+                        if (intercepts == null) linkLabelCount--;
+
+                        //move everything to the other side and get rid of coef
+                        LinkLabel solve = addLinkLabel("Put Equation into Slope-Intercept Form", "SolveForY", linkLabelCount++);
+                        if (solve == null) linkLabelCount--;
+
+                        LinkLabel graph = addLinkLabel("Graphing a Non-Linear Equation", "GraphNonLinear", linkLabelCount++);
+                        if (graph == null) linkLabelCount--;
+                    }
+                }
             }
         }
 
@@ -2147,10 +2879,109 @@ namespace MATT
             bool multipleTerms = separateMultTerms(givenEqn, ' ', out givenEqn);
             if (multipleTerms)
             {
-                //add order of operations first then check for other stuff
+                string[] splitEqn = givenEqn.Split(' ');
+                if (splitEqn.Length == 3) //two nums and an operator ie 5+4
+                {
+                    string op = splitEqn[1];
+                    //find if other terms are multiple or not
+                    string before = splitEqn[0];
+                    string after = splitEqn[2];
+                    bool multBefore = separateMultTerms(before, ' ', out before);
+                    bool multAfter = separateMultTerms(after, ' ', out after);
+                    switch (op)
+                    {
+                        case "+":
+                        case "-":
+                            if (multAfter || multBefore)
+                            {
+                                if (after.Contains('/') || before.Contains('/'))
+                                {
+                                    //adding fractions
+                                    LinkLabel addFrac = addLinkLabel("Adding/Subtracting Fractions", "AddSubFrac", linkLabelCount++);
+                                    if (addFrac == null) linkLabelCount--;
+                                    loadInstructions(addFrac);
+                                }
+                                else
+                                {
+                                    //simplify quantities then add
+                                    instructionsRTB.Text += "First, use the order of operations to simplify the terms in parentheses.";
+                                    LinkLabel add = addLinkLabel("Basic Addition/Subtraction", "BasicAddSub", linkLabelCount++);
+                                    if (add == null) linkLabelCount--;
+                                    loadInstructions(add);
+                                }
+                            }
+                            else
+                            {
+                                //add the two quantities
+                                LinkLabel add = addLinkLabel("Basic Addition/Subtraction", "BasicAddSub", linkLabelCount++);
+                                if (add == null) linkLabelCount--;
+                                loadInstructions(add);
+                            }
+                            break;
+                        case "*":
+                            if (multAfter || multBefore)
+                            {
+                                if (after.Contains('/') || before.Contains('/'))
+                                {
+                                    //multiplying fractions
+                                    LinkLabel addFrac = addLinkLabel("Multiplying Fractions", "MultFrac", linkLabelCount++);
+                                    if (addFrac == null) linkLabelCount--;
+                                    loadInstructions(addFrac);
+                                }
+                                else
+                                {
+                                    //simplify quantities then multiply
+                                    instructionsRTB.Text += "First, use the order of operations to simplify the terms in parentheses.";
+                                    LinkLabel add = addLinkLabel("Basic Multiplication", "BasicMult", linkLabelCount++);
+                                    if (add == null) linkLabelCount--;
+                                    loadInstructions(add);
+                                }
+                            }
+                            else
+                            {
+                                //multiply the two quantities
+                                LinkLabel add = addLinkLabel("Basic Multiplication", "BasicMult", linkLabelCount++);
+                                if (add == null) linkLabelCount--;
+                                loadInstructions(add);
+                            }
+                            break;
+                        case "/":
+                            if (multAfter || multBefore)
+                            {
+                                if (after.Contains('/') || before.Contains('/'))
+                                {
+                                    //dividing fractions
+                                    LinkLabel divFrac = addLinkLabel("Dividing Fractions", "DivFrac", linkLabelCount++);
+                                    if (divFrac == null) linkLabelCount--;
+                                    loadInstructions(divFrac);
+
+                                    LinkLabel addFrac = addLinkLabel("Multiplying Fractions", "MultFrac", linkLabelCount++);
+                                    if (addFrac == null) linkLabelCount--;
+                                }
+                                else
+                                {
+                                    //simplify quantities then divide
+                                    instructionsRTB.Text += "First, use the order of operations to simplify the terms in parentheses.";
+                                    LinkLabel add = addLinkLabel("Basic Division", "BasicDiv", linkLabelCount++);
+                                    if (add == null) linkLabelCount--;
+                                    loadInstructions(add);
+                                }
+                            }
+                            else
+                            {
+                                //divide the two quantities
+                                LinkLabel add = addLinkLabel("Basic Division", "BasicDiv", linkLabelCount++);
+                                if (add == null) linkLabelCount--;
+                                loadInstructions(add);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                //add order of operations last but don't display
                 LinkLabel ooo = addLinkLabel("Order of Operations", "OrderOfOperations", linkLabelCount++);
                 if (ooo == null) linkLabelCount--;
-                loadInstructions(ooo);
             }
             //if they user entered just a number
             double parsedNum;
@@ -2249,6 +3080,14 @@ namespace MATT
                     }
                 }
             }
+        }
+
+        private void clearLabel_Click(object sender, EventArgs e)
+        {
+            instructionsRTB.Text = "Hi, I'm MATT! Enter an equation or expression above"
+            + "and I'll try to help you work through the problem. If you have multiple equations, please separate them with a semicolon (;).";
+            equationTB.Text = "";
+            linkLabelPanel.Controls.Clear();
         }
 
     }

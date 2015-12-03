@@ -33,6 +33,7 @@
             this.equationTB = new System.Windows.Forms.TextBox();
             this.eqnPromptLbl = new System.Windows.Forms.Label();
             this.solveBtn = new System.Windows.Forms.Button();
+            this.clearLabel = new System.Windows.Forms.Label();
             this.optionsPanel = new System.Windows.Forms.Panel();
             this.linkLabelPanel = new System.Windows.Forms.Panel();
             this.otherOptionsLbl = new System.Windows.Forms.Label();
@@ -46,6 +47,7 @@
             this.inputPanel.Controls.Add(this.equationTB);
             this.inputPanel.Controls.Add(this.eqnPromptLbl);
             this.inputPanel.Controls.Add(this.solveBtn);
+            this.inputPanel.Controls.Add(this.clearLabel);
             this.inputPanel.Dock = System.Windows.Forms.DockStyle.Top;
             this.inputPanel.Location = new System.Drawing.Point(0, 0);
             this.inputPanel.Name = "inputPanel";
@@ -85,6 +87,16 @@
             this.solveBtn.UseVisualStyleBackColor = true;
             this.solveBtn.Click += new System.EventHandler(this.solveBtn_Click);
             // 
+            // clearLabel
+            // 
+            this.clearLabel.AutoSize = true;
+            this.clearLabel.Location = new System.Drawing.Point(5, 35);
+            this.clearLabel.Name = "clearLabel";
+            this.clearLabel.Size = new System.Drawing.Size(100, 17);
+            this.clearLabel.TabIndex = 3;
+            this.clearLabel.Text = "                       ";
+            this.clearLabel.Click += new System.EventHandler(this.clearLabel_Click);
+            // 
             // optionsPanel
             // 
             this.optionsPanel.Controls.Add(this.linkLabelPanel);
@@ -122,8 +134,9 @@
             this.instructionsRTB.Name = "instructionsRTB";
             this.instructionsRTB.Size = new System.Drawing.Size(868, 494);
             this.instructionsRTB.TabIndex = 2;
-            this.instructionsRTB.Text = "Hi, I\'m MATT! Enter an equation above to get started and I\'ll try to help you wor" +
-    "k through the problem.";
+            this.instructionsRTB.Text = "Hi, I\'m MATT! Enter an equation or expression above and I\'ll try to help you work" +
+    " through the problem. If you have multiple equations, please separate them with " +
+    "a semicolon (;).";
             // 
             // mainForm
             // 
@@ -155,6 +168,7 @@
         private System.Windows.Forms.Label otherOptionsLbl;
         private System.Windows.Forms.RichTextBox instructionsRTB;
         private System.Windows.Forms.Panel linkLabelPanel;
+        private System.Windows.Forms.Label clearLabel;
     }
 }
 
